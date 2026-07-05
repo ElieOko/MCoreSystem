@@ -1,21 +1,34 @@
 package elieoko.app.mcoresystem.domain.interfaces.room
 
 import androidx.room.*
-import elieoko.app.mcoresystem.domain.model.room.CategoryModel
 import elieoko.app.mcoresystem.domain.model.room.OperationModel
-import elieoko.app.mcoresystem.domain.model.room.PaymentMethodModel
+import elieoko.app.mcoresystem.domain.model.room.relation.OperationRelation
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface IOperationDao {
-    @Query("SELECT * FROM TOperation")
-    fun getAll(): List<OperationModel>
+    @Transaction
+    @Query("SELECT * FROM TOperation WHERE user_id LIKE :userId")
+    fun getAll(userId : Int): Flow<List<OperationRelation>>
+
+    @Transaction
+    @Query("SELECT * FROM TOperation WHERE operation_id LIKE :operationId")
+    fun getDetailOperation(operationId : Int): Flow<OperationRelation>
+
+    @Query("SELECT SUM(amount) FROM TOperation WHERE created_on LIKE :dateCurrent AND currency_id LIKE :currencyId AND user_id LIKE :userId")
+    fun getOperationToDay(dateCurrent: String, currencyId: Int, userId: Int): Int?
+
+    @Query("SELECT SUM(amount) FROM TOperation WHERE created_on LIKE :dateCurrent AND currency_id LIKE :currencyId AND user_id LIKE :userId")
+    fun getOperationToDayCDF(dateCurrent: String, currencyId: Int, userId: Int): Int?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertAll(vararg operationModel: OperationModel)
+    suspend fun insertAll(operations: OperationModel):Long
 
     @Update(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun updateAll(vararg operationModel: OperationModel)
+    fun updateAll(vararg operations: OperationModel)
 
     @Delete
     suspend fun delete(operationModel: OperationModel)
+
+
 }
