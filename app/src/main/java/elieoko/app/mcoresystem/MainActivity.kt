@@ -20,9 +20,12 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import elieoko.app.mcoresystem.domain.route.Navigation
+import elieoko.app.mcoresystem.domain.route.ScreenRoute
 import elieoko.app.mcoresystem.domain.viewmodel.config.*
 import elieoko.app.mcoresystem.domain.viewmodel.room.*
 import elieoko.app.mcoresystem.presentation.ui.theme.*
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import kotlin.getValue
 
 class MainActivity : ComponentActivity() {
@@ -56,6 +59,16 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         ensureNotificationPermission()
+
+        val app = application as MCoreApplication
+        // Restauration de session : l'écran de connexion n'apparaît que si nécessaire.
+        val restoredSession = runBlocking { app.sessionRepository.session.first() }
+        val startDestination =
+            if (restoredSession.isLoggedIn) ScreenRoute.Home.name else ScreenRoute.Login.name
+        if (restoredSession.isLoggedIn) {
+            app.triggerSync()
+        }
+
         setContent {
             navHostController = rememberNavController()
             MCoreSystemTheme {
@@ -70,7 +83,11 @@ class MainActivity : ComponentActivity() {
                             categoryViewModel = categoryViewModel,
                             typeCategoryViewModel = typeCategoryViewModel
                         ),
-                        exchangeRateRepository = (application as MCoreApplication).exchangeRateRepository
+                        exchangeRateRepository = app.exchangeRateRepository,
+                        sessionRepository = app.sessionRepository,
+                        authRepository = app.authRepository,
+                        syncManager = app.syncManager,
+                        onRequestSync = { app.triggerSync() }
                     )
                 }
                 applicationViewModel.room.currency = currencyViewModel
@@ -81,7 +98,7 @@ class MainActivity : ComponentActivity() {
                 applicationViewModel.room.typeCategory = typeCategoryViewModel
                 applicationViewModel.room.organism = organismViewModel
                 Scaffold(modifier = Modifier.fillMaxSize()) {
-                    Navigation(navHostController, applicationViewModel)
+                    Navigation(navHostController, applicationViewModel, startDestination)
                 }
             }
         }

@@ -54,6 +54,22 @@ fun SettingPage(
     val addedMsg = stringResource(R.string.item_added)
     val deletedMsg = stringResource(R.string.item_deleted)
 
+    val currencyError by viewModelGlobal?.room?.currency?.error?.collectAsState()
+        ?: remember { mutableStateOf(null) }
+    val paymentError by viewModelGlobal?.room?.paymentMethod?.error?.collectAsState()
+        ?: remember { mutableStateOf(null) }
+    val genericError = stringResource(R.string.error_generic)
+    LaunchedEffect(currencyError, paymentError) {
+        if (currencyError != null || paymentError != null) {
+            snackbarHost.showSnackbar(genericError)
+            viewModelGlobal?.room?.currency?.consumeError()
+            viewModelGlobal?.room?.paymentMethod?.consumeError()
+        }
+    }
+
+    val syncStatus by viewModelGlobal?.syncStatus?.collectAsState()
+        ?: remember { mutableStateOf(elieoko.app.mcoresystem.data.remote.SyncStatus.OFFLINE_ONLY) }
+
     Scaffold(
         topBar = {
             TopBarSimple(
@@ -170,6 +186,18 @@ fun SettingPage(
             MCoreCard {
                 Column(Modifier.padding(vertical = 4.dp)) {
                     InfoRow(Icons.Default.Person, stringResource(R.string.user), username)
+                    val syncLabel = when (syncStatus) {
+                        elieoko.app.mcoresystem.data.remote.SyncStatus.SYNCING -> stringResource(R.string.sync_status_syncing)
+                        elieoko.app.mcoresystem.data.remote.SyncStatus.SUCCESS -> stringResource(R.string.sync_status_success)
+                        elieoko.app.mcoresystem.data.remote.SyncStatus.ERROR -> stringResource(R.string.sync_status_error)
+                        else -> stringResource(R.string.sync_status_offline)
+                    }
+                    ManageableRow(
+                        icon = Icons.Default.CloudSync,
+                        title = stringResource(R.string.sync_now),
+                        subtitle = syncLabel,
+                        onClick = { viewModelGlobal?.requestSync() }
+                    )
                     InfoRow(Icons.Default.Info, "MCoreSystem", stringResource(R.string.app_version))
                 }
             }
@@ -251,54 +279,6 @@ private fun PaymentDialog(onDismiss: () -> Unit, onSave: (PaymentMethodModel) ->
 }
 
 @Composable
-private fun ManageableRow(icon: ImageVector, title: String, subtitle: String?, onDelete: () -> Unit) {
-    var confirm by remember { mutableStateOf(false) }
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
-        Space(x = 16)
-        Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
-            if (subtitle != null) Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        Icon(
-            Icons.Default.Delete,
-            contentDescription = stringResource(R.string.delete),
-            tint = MaterialTheme.colorScheme.error,
-            modifier = Modifier.size(22.dp).clickable { confirm = true }
-        )
-    }
-    HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f))
-
-    if (confirm) {
-        AlertDialog(
-            onDismissRequest = { confirm = false },
-            title = { Text(stringResource(R.string.delete_confirm_title)) },
-            text = { Text(stringResource(R.string.delete_confirm_message)) },
-            confirmButton = {
-                TextButton(onClick = { confirm = false; onDelete() }) {
-                    Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = { TextButton(onClick = { confirm = false }) { Text(stringResource(R.string.cancel)) } }
-        )
-    }
-}
-
-@Composable
 private fun InfoRow(icon: ImageVector, label: String, value: String) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
-        Space(x = 16)
-        Column(Modifier.weight(1f)) {
-            Text(label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
-            Text(value, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
-    HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f))
+    ManageableRow(icon = icon, title = label, subtitle = value)
 }

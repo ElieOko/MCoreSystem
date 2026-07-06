@@ -1,20 +1,19 @@
 package elieoko.app.mcoresystem.presentation.ui.pages.category
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Category
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import elieoko.app.mcoresystem.R
 import elieoko.app.mcoresystem.domain.model.room.CategoryModel
-import elieoko.app.mcoresystem.domain.model.room.TypeCategoryModel
 import elieoko.app.mcoresystem.domain.viewmodel.config.ApplicationViewModel
 import elieoko.app.mcoresystem.presentation.components.element.*
 import kotlinx.coroutines.launch
@@ -30,6 +29,8 @@ fun CategoryPage(
         ?: remember { mutableStateOf(emptyList()) }
     val typeCategories by viewModelGlobal?.room?.typeCategory?.listTypeCategories?.collectAsState()
         ?: remember { mutableStateOf(emptyList()) }
+    val categoryError by viewModelGlobal?.room?.category?.error?.collectAsState()
+        ?: remember { mutableStateOf(null) }
 
     var showDialog by remember { mutableStateOf(false) }
     var name by remember { mutableStateOf("") }
@@ -42,6 +43,7 @@ fun CategoryPage(
     val scope = rememberCoroutineScope()
     val addedMsg = stringResource(R.string.item_added)
     val deletedMsg = stringResource(R.string.item_deleted)
+    val genericError = stringResource(R.string.error_generic)
 
     LaunchedEffect(Unit) {
         viewModelGlobal?.room?.category?.getAll()
@@ -51,6 +53,13 @@ fun CategoryPage(
     LaunchedEffect(typeCategories) {
         if (typeCategories.isNotEmpty() && selectedTypeId == 0) {
             selectedTypeId = typeCategories.first().id
+        }
+    }
+
+    LaunchedEffect(categoryError) {
+        if (categoryError != null) {
+            snackbarHost.showSnackbar(genericError)
+            viewModelGlobal?.room?.category?.consumeError()
         }
     }
 
@@ -71,27 +80,39 @@ fun CategoryPage(
         },
         containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
-        if (categories.isEmpty()) {
-            Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                EmptyState(message = stringResource(R.string.no_data))
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = PaddingValues(vertical = 16.dp)
-            ) {
-                items(categories, key = { it.id }) { category ->
-                    CategoryListItem(
-                        category = category,
-                        typeCategories = typeCategories,
-                        onDelete = {
-                            viewModelGlobal?.room?.category?.delete(category)
-                            scope.launch { snackbarHost.showSnackbar(deletedMsg) }
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp)
+        ) {
+            SectionHeader(title = stringResource(R.string.categories))
+            Space(y = 8)
+            MCoreCard {
+                Column(Modifier.padding(vertical = 4.dp)) {
+                    if (categories.isEmpty()) {
+                        EmptyState(message = stringResource(R.string.no_data))
+                    } else {
+                        categories.forEach { category ->
+                            val typeName = typeCategories.find { it.id == category.typeCategoryId }?.name
+                            ManageableRow(
+                                icon = Icons.Default.Category,
+                                title = category.name,
+                                subtitle = listOfNotNull(
+                                    category.description.ifBlank { null },
+                                    typeName
+                                ).joinToString(" • ").ifBlank { null },
+                                onDelete = {
+                                    viewModelGlobal?.room?.category?.delete(category)
+                                    scope.launch { snackbarHost.showSnackbar(deletedMsg) }
+                                }
+                            )
                         }
-                    )
+                    }
                 }
             }
+            Space(y = 80)
         }
     }
 
@@ -134,36 +155,13 @@ fun CategoryPage(
                     description = ""
                     showError = false
                     showDialog = false
+                    viewModelGlobal?.requestSync()
                     scope.launch { snackbarHost.showSnackbar(addedMsg) }
-                }) { Text(stringResource(R.string.save), color = MaterialTheme.colorScheme.primary) }
+                }) { Text(stringResource(R.string.save), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold) }
             },
             dismissButton = {
                 TextButton(onClick = { showDialog = false }) { Text(stringResource(R.string.cancel)) }
             }
         )
-    }
-}
-
-@Composable
-private fun CategoryListItem(
-    category: CategoryModel,
-    typeCategories: List<TypeCategoryModel>,
-    onDelete: () -> Unit
-) {
-    val typeName = typeCategories.find { it.id == category.typeCategoryId }?.name ?: "—"
-    DeleteableListItem(onDelete = onDelete) {
-        Column(Modifier.weight(1f).padding(vertical = 8.dp)) {
-            Text(category.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            Text(category.description.ifBlank { "—" }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Space(y = 4)
-            AssistChip(
-                onClick = {},
-                label = { Text(typeName) },
-                colors = AssistChipDefaults.assistChipColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    labelColor = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            )
-        }
     }
 }

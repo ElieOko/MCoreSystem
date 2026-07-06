@@ -12,70 +12,58 @@ class OperationViewModel(private val repository: OperationRepository) : ViewMode
 
     private val _listOperation = MutableStateFlow<List<OperationRelation>>(arrayListOf())
     private val _operationDetail = MutableStateFlow<OperationRelation?>(OperationRelation())
-    private val _listOperationAll = MutableStateFlow<List<OperationRelation>>(emptyList())
     private val _stateSave = MutableStateFlow<Long>(0)
+    private val _error = MutableStateFlow<String?>(null)
     val listOperation get() = _listOperation.asStateFlow()
     val operationDetail get() = _operationDetail.asStateFlow()
     val stateSave get() = _stateSave.asStateFlow()
-    val listOperationAll get() = _listOperationAll.asStateFlow()
+    val error get() = _error.asStateFlow()
 
     private val _listOperationToDay = MutableStateFlow<Int?>(0)
-    private val _listOperationToDayCDF = MutableStateFlow<Int?>(0)
     val listOperationToday get() = _listOperationToDay.asStateFlow()
-    val listOperationTodayCDF get() = _listOperationToDayCDF.asStateFlow()
 
-    fun getAllOperation(userId : Int) = viewModelScope.launch {
-        withContext(Dispatchers.IO) {
-            repository.allOperation(userId).collect {
-                _listOperation.value = it
-            }
+    fun getAllOperation(userId : Int) = safeLaunch {
+        repository.allOperation(userId).collect {
+            _listOperation.value = it
         }
     }
 
-    fun getDetailOperation(operationId : Int) = viewModelScope.launch {
-        withContext(Dispatchers.IO) {
-            repository.getDetailOperation(operationId).collect {
-                _operationDetail.value = it
-            }
+    fun getDetailOperation(operationId : Int) = safeLaunch {
+        repository.getDetailOperation(operationId).collect {
+            _operationDetail.value = it
         }
     }
 
-    fun getAllOperationToDay(dateCurrent : String, currencyId : Int, userId : Int) = viewModelScope.launch {
-        withContext(Dispatchers.IO) {
-            _listOperationToDay.value = repository.allOperationDay(dateCurrent,currencyId,userId)
-            Log.e("vm today ->","${_listOperationToDay.value}")
-        }
+    fun getAllOperationToDay(dateCurrent : String, currencyId : Int, userId : Int) = safeLaunch {
+        _listOperationToDay.value = repository.allOperationDay(dateCurrent, currencyId, userId)
     }
 
-    fun getAllOperationToDayCDF(dateCurrent : String, currencyId : Int, userId : Int) = viewModelScope.launch {
-        withContext(Dispatchers.IO) {
-            _listOperationToDayCDF.value = repository.allOperationDayCDF(dateCurrent,currencyId,userId)
-        }
+    fun insert(operation: OperationModel) = safeLaunch {
+        _stateSave.value = repository.insert(operation)
     }
 
-    fun insert(operation: OperationModel) = viewModelScope.launch {
-        withContext(Dispatchers.IO) {
-            _stateSave.value = repository.insert(operation)
-            Log.e("vm insert =>","$operation")
-            Log.e("state row =>","${_stateSave.value}")
-        }
+    fun update(operation: OperationModel) = safeLaunch {
+        repository.update(operation)
     }
 
-    fun update(operation: OperationModel) = viewModelScope.launch {
-        withContext(Dispatchers.IO) {
-            repository.update(operation)
-        }
+    fun delete(operation: OperationModel) = safeLaunch {
+        repository.delete(operation)
     }
 
-    fun delete(operation: OperationModel) = viewModelScope.launch {
-        withContext(Dispatchers.IO) {
-            repository.delete(operation)
-        }
+    fun updateStatus(operationId: Int, status: String) = safeLaunch {
+        repository.updateStatus(operationId, status)
     }
 
-    fun updateStatus(operationId: Int, status: String) = viewModelScope.launch {
-        withContext(Dispatchers.IO) {
-            repository.updateStatus(operationId, status)
+    fun consumeError() { _error.value = null }
+
+    private fun safeLaunch(block: suspend () -> Unit) = viewModelScope.launch {
+        try {
+            withContext(Dispatchers.IO) { block() }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.e("OperationViewModel", "Opération échouée", e)
+            _error.value = e.message ?: "Une erreur est survenue"
         }
     }
 }

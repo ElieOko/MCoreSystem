@@ -1,5 +1,6 @@
 package elieoko.app.mcoresystem.domain.viewmodel.room
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -14,36 +15,39 @@ import kotlinx.coroutines.withContext
 class PaymentMethodViewModel(private val repository: PaymentMethodRepository) : ViewModel() {
 
     private val _listPaymentMethod = MutableStateFlow<List<PaymentMethodModel>>(arrayListOf())
+    private val _error = MutableStateFlow<String?>(null)
     val listPaymentMethod get() = _listPaymentMethod.asStateFlow()
+    val error get() = _error.asStateFlow()
 
-    fun getAllPaymentMethod() = viewModelScope.launch {
+    fun getAllPaymentMethod() = safeLaunch { refresh() }
+
+    fun insert(paymentMethod: PaymentMethodModel) = safeLaunch {
+        repository.insert(paymentMethod)
         refresh()
     }
 
-    fun insert(paymentMethod: PaymentMethodModel) = viewModelScope.launch {
-        withContext(Dispatchers.IO) {
-            repository.insert(paymentMethod)
-            refresh()
-        }
+    fun update(paymentMethod: PaymentMethodModel) = safeLaunch {
+        repository.update(paymentMethod)
+        refresh()
     }
 
-    fun update(paymentMethod: PaymentMethodModel) = viewModelScope.launch {
-        withContext(Dispatchers.IO) {
-            repository.update(paymentMethod)
-            refresh()
-        }
+    fun delete(paymentMethod: PaymentMethodModel) = safeLaunch {
+        repository.delete(paymentMethod)
+        refresh()
     }
 
-    fun delete(paymentMethod: PaymentMethodModel) = viewModelScope.launch {
-        withContext(Dispatchers.IO) {
-            repository.delete(paymentMethod)
-            refresh()
-        }
-    }
+    fun consumeError() { _error.value = null }
 
     private suspend fun refresh() {
-        withContext(Dispatchers.IO) {
-            _listPaymentMethod.value = repository.allPaymentMethod()
+        _listPaymentMethod.value = repository.allPaymentMethod()
+    }
+
+    private fun safeLaunch(block: suspend () -> Unit) = viewModelScope.launch {
+        try {
+            withContext(Dispatchers.IO) { block() }
+        } catch (e: Exception) {
+            Log.e("PaymentMethodVM", "Opération échouée", e)
+            _error.value = e.message ?: "Une erreur est survenue"
         }
     }
 }

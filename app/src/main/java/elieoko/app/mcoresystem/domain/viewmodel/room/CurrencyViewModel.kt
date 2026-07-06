@@ -1,5 +1,6 @@
 package elieoko.app.mcoresystem.domain.viewmodel.room
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -13,36 +14,39 @@ import kotlinx.coroutines.withContext
 
 class CurrencyViewModel(private val repository: CurrencyRepository) : ViewModel() {
     private val _listCurrencies = MutableStateFlow<List<CurrencyModel>>(arrayListOf())
+    private val _error = MutableStateFlow<String?>(null)
     val listCurrencies get() = _listCurrencies.asStateFlow()
+    val error get() = _error.asStateFlow()
 
-    fun getAllCurrencies() = viewModelScope.launch {
+    fun getAllCurrencies() = safeLaunch { refresh() }
+
+    fun insert(currency: CurrencyModel) = safeLaunch {
+        repository.insert(currency)
         refresh()
     }
 
-    fun insert(currency: CurrencyModel) = viewModelScope.launch {
-        withContext(Dispatchers.IO) {
-            repository.insert(currency)
-            refresh()
-        }
+    fun update(currency: CurrencyModel) = safeLaunch {
+        repository.update(currency)
+        refresh()
     }
 
-    fun update(currency: CurrencyModel) = viewModelScope.launch {
-        withContext(Dispatchers.IO) {
-            repository.update(currency)
-            refresh()
-        }
+    fun delete(currency: CurrencyModel) = safeLaunch {
+        repository.delete(currency)
+        refresh()
     }
 
-    fun delete(currency: CurrencyModel) = viewModelScope.launch {
-        withContext(Dispatchers.IO) {
-            repository.delete(currency)
-            refresh()
-        }
-    }
+    fun consumeError() { _error.value = null }
 
     private suspend fun refresh() {
-        withContext(Dispatchers.IO) {
-            _listCurrencies.value = repository.allCurrency()
+        _listCurrencies.value = repository.allCurrency()
+    }
+
+    private fun safeLaunch(block: suspend () -> Unit) = viewModelScope.launch {
+        try {
+            withContext(Dispatchers.IO) { block() }
+        } catch (e: Exception) {
+            Log.e("CurrencyViewModel", "Opération échouée", e)
+            _error.value = e.message ?: "Une erreur est survenue"
         }
     }
 }
