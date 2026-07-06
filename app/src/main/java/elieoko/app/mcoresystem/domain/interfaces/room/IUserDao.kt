@@ -17,6 +17,12 @@ interface IUserDao {
     @Query("SELECT * FROM TUser WHERE user_id IN (:userId)")
     fun loadAllById(userId: Int): List<UserModel>
 
+    @Query("SELECT * FROM TUser WHERE username = :username AND password = :password LIMIT 1")
+    fun login(username: String, password: String): UserModel?
+
+    @Query("SELECT COUNT(*) FROM TUser")
+    fun countUsers(): Int
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     fun insertAll(vararg users: UserModel)
 
