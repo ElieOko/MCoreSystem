@@ -1,21 +1,28 @@
 package elieoko.app.mcoresystem
 
+import android.annotation.SuppressLint
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.*
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.rememberNavController
+import elieoko.app.mcoresystem.domain.route.Navigation
 import elieoko.app.mcoresystem.domain.viewmodel.config.*
 import elieoko.app.mcoresystem.domain.viewmodel.room.*
 import elieoko.app.mcoresystem.presentation.ui.theme.*
 import kotlin.getValue
 
 class MainActivity : ComponentActivity() {
+    private lateinit var navHostController: NavHostController
     private val userViewModel: UserViewModel by viewModels { UserViewModelFactory((application as MCoreApplication).userRepository) }
     private val currencyViewModel: CurrencyViewModel by viewModels { CurrencyViewModelFactory((application as MCoreApplication).currencyRepository) }
     private val paymentMethodViewModel: PaymentMethodViewModel by viewModels { PaymentMethodViewModelFactory((application as MCoreApplication).paymentMethodRepository) }
@@ -24,24 +31,36 @@ class MainActivity : ComponentActivity() {
     private val categoryViewModel: CategoryViewModel by viewModels { CategoryViewModelFactory((application as MCoreApplication).categoryRepository) }
     private val typeCategoryViewModel: TypeCategoryViewModel by viewModels { TypeCategoryViewModelFactory((application as MCoreApplication).typeCategoryRepository) }
 
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
+    @SuppressLint("ViewModelConstructorInComposable", "UnusedMaterial3ScaffoldPaddingParameter")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            val applicationViewModel = viewModel<ApplicationViewModel>()
-            applicationViewModel.room.currency = currencyViewModel
-            applicationViewModel.room.user = userViewModel
-            applicationViewModel.room.paymentMethod = paymentMethodViewModel
-            applicationViewModel.room.operation = operationViewModel
-            applicationViewModel.room.category = categoryViewModel
-            applicationViewModel.room.typeCategory = typeCategoryViewModel
-            applicationViewModel.room.organism = organismViewModel
+            navHostController = rememberNavController()
             MCoreSystemTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "Android",
-                        modifier = Modifier.padding(innerPadding)
+                val applicationViewModel = viewModel<ApplicationViewModel>{
+                    ApplicationViewModel(
+                        roomVm = InstanceRoomViewModel(
+                            currencyViewModel = currencyViewModel,
+                            userViewModel = userViewModel,
+                            paymentMethodViewModel = paymentMethodViewModel,
+                            organismViewModel = organismViewModel,
+                            operationViewModel = operationViewModel,
+                            categoryViewModel = categoryViewModel,
+                            typeCategoryViewModel = typeCategoryViewModel
+                        )
                     )
+                }
+                applicationViewModel.room.currency = currencyViewModel
+                applicationViewModel.room.user = userViewModel
+                applicationViewModel.room.paymentMethod = paymentMethodViewModel
+                applicationViewModel.room.operation = operationViewModel
+                applicationViewModel.room.category = categoryViewModel
+                applicationViewModel.room.typeCategory = typeCategoryViewModel
+                applicationViewModel.room.organism = organismViewModel
+                Scaffold(modifier = Modifier.fillMaxSize()) {
+                    Navigation(navHostController, applicationViewModel)
                 }
             }
         }
