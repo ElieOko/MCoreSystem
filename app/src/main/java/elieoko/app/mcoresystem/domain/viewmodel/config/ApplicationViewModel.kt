@@ -1,13 +1,7 @@
 package elieoko.app.mcoresystem.domain.viewmodel.config
 
-import androidx.lifecycle.ViewModel
-import elieoko.app.mcoresystem.domain.viewmodel.room.CategoryViewModel
-import elieoko.app.mcoresystem.domain.viewmodel.room.CurrencyViewModel
-import elieoko.app.mcoresystem.domain.viewmodel.room.OperationViewModel
-import elieoko.app.mcoresystem.domain.viewmodel.room.OrganismViewModel
-import elieoko.app.mcoresystem.domain.viewmodel.room.PaymentMethodViewModel
-import elieoko.app.mcoresystem.domain.viewmodel.room.TypeCategoryViewModel
-import elieoko.app.mcoresystem.domain.viewmodel.room.UserViewModel
+import androidx.lifecycle.*
+import elieoko.app.mcoresystem.domain.viewmodel.room.*
 
 class InstanceRoomViewModel(
     currencyViewModel : CurrencyViewModel,

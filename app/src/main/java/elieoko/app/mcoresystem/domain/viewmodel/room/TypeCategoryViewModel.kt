@@ -22,13 +22,13 @@ class TypeCategoryViewModel(private val repository: TypeCategorieRepository) : V
         }
     }
 
-    fun insert(data : CategoryModel) = viewModelScope.launch {
+    fun insert(data : TypeCategoryModel) = viewModelScope.launch {
         withContext(Dispatchers.IO) {
             repository.insert(data)
         }
     }
 
-    fun update(data : CategoryModel) = viewModelScope.launch {
+    fun update(data : TypeCategoryModel) = viewModelScope.launch {
         withContext(Dispatchers.IO) {
             repository.update(data)
         }
