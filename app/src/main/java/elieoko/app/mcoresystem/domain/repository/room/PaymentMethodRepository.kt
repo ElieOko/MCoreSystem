@@ -17,4 +17,9 @@ class PaymentMethodRepository(val paymentMethodDao: IPaymentMethodDao) {
     suspend fun update(paymentMethod: PaymentMethodModel) {
         paymentMethodDao.updateAll(paymentMethod)
     }
+
+    @WorkerThread
+    suspend fun delete(paymentMethod: PaymentMethodModel) {
+        paymentMethodDao.delete(paymentMethod)
+    }
 }

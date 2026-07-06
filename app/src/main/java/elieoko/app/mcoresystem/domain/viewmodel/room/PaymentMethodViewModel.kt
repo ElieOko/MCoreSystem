@@ -16,26 +16,34 @@ class PaymentMethodViewModel(private val repository: PaymentMethodRepository) : 
     private val _listPaymentMethod = MutableStateFlow<List<PaymentMethodModel>>(arrayListOf())
     val listPaymentMethod get() = _listPaymentMethod.asStateFlow()
 
-    fun getAllPaymentMethod(){
-        viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                _listPaymentMethod.value = repository.allPaymentMethod()
-            }
-        }
+    fun getAllPaymentMethod() = viewModelScope.launch {
+        refresh()
     }
-    fun insert(paymentMethod : PaymentMethodModel) = viewModelScope.launch {
+
+    fun insert(paymentMethod: PaymentMethodModel) = viewModelScope.launch {
         withContext(Dispatchers.IO) {
             repository.insert(paymentMethod)
+            refresh()
         }
     }
 
-    fun update(paymentMethod : PaymentMethodModel) = viewModelScope.launch {
+    fun update(paymentMethod: PaymentMethodModel) = viewModelScope.launch {
         withContext(Dispatchers.IO) {
             repository.update(paymentMethod)
+            refresh()
         }
-
     }
 
+    fun delete(paymentMethod: PaymentMethodModel) = viewModelScope.launch {
+        withContext(Dispatchers.IO) {
+            repository.delete(paymentMethod)
+            refresh()
+        }
+    }
+
+    private suspend fun refresh() {
+        _listPaymentMethod.value = repository.allPaymentMethod()
+    }
 }
 
 class PaymentMethodViewModelFactory(private val repository: PaymentMethodRepository) : ViewModelProvider.Factory {

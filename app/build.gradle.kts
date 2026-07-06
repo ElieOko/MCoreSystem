@@ -107,6 +107,8 @@ dependencies {
     implementation(libs.androidx.room.ktx)
     // Accompanist Permissions
     implementation(libs.accompanist.permissions)
+    // WorkManager (notifications planifiées)
+    implementation(libs.androidx.work.runtime.ktx)
     //firebase
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.analytics)

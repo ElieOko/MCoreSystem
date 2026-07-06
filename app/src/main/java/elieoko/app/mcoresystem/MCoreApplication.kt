@@ -1,6 +1,7 @@
 package elieoko.app.mcoresystem
 
 import android.app.*
+import elieoko.app.mcoresystem.data.notification.ReminderScheduler
 import elieoko.app.mcoresystem.data.preferences.ExchangeRateRepository
 import elieoko.app.mcoresystem.data.room.*
 import elieoko.app.mcoresystem.domain.repository.room.*
@@ -18,7 +19,10 @@ class MCoreApplication : Application() {
     val organismRepository by lazy { OrganismRepository(database.organismDao()) }
     val exchangeRateRepository by lazy { ExchangeRateRepository(this) }
 
-
+    override fun onCreate() {
+        super.onCreate()
+        ReminderScheduler.schedule(this)
+    }
 }
 //    override fun onTrimMemory(level: Int) {
 //        super.onTrimMemory(level)

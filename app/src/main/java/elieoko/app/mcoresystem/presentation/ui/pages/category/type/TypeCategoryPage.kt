@@ -16,6 +16,7 @@ import elieoko.app.mcoresystem.R
 import elieoko.app.mcoresystem.domain.model.room.TypeCategoryModel
 import elieoko.app.mcoresystem.domain.viewmodel.config.ApplicationViewModel
 import elieoko.app.mcoresystem.presentation.components.element.*
+import kotlinx.coroutines.launch
 
 @Composable
 fun TypeCategoryPage(
@@ -29,6 +30,12 @@ fun TypeCategoryPage(
     var showDialog by remember { mutableStateOf(false) }
     var name by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
+    var showError by remember { mutableStateOf(false) }
+
+    val snackbarHost = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    val addedMsg = stringResource(R.string.item_added)
+    val deletedMsg = stringResource(R.string.item_deleted)
 
     LaunchedEffect(Unit) {
         viewModelGlobal?.room?.typeCategory?.getAll()
@@ -43,6 +50,7 @@ fun TypeCategoryPage(
                 username = viewModelGlobal?.currentUsername?.value
             )
         },
+        snackbarHost = { SnackbarHost(snackbarHost) },
         floatingActionButton = {
             FloatingActionButton(onClick = { showDialog = true }, containerColor = MaterialTheme.colorScheme.primary) {
                 Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add))
@@ -52,7 +60,7 @@ fun TypeCategoryPage(
     ) { padding ->
         if (typeCategories.isEmpty()) {
             Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                Text(stringResource(R.string.no_data), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                EmptyState(message = stringResource(R.string.no_data))
             }
         } else {
             LazyColumn(
@@ -63,7 +71,10 @@ fun TypeCategoryPage(
                 items(typeCategories, key = { it.id }) { type ->
                     TypeCategoryListItem(
                         type = type,
-                        onDelete = { viewModelGlobal?.room?.typeCategory?.delete(type) }
+                        onDelete = {
+                            viewModelGlobal?.room?.typeCategory?.delete(type)
+                            scope.launch { snackbarHost.showSnackbar(deletedMsg) }
+                        }
                     )
                 }
             }
@@ -76,20 +87,22 @@ fun TypeCategoryPage(
             title = { Text("${stringResource(R.string.add)} ${stringResource(R.string.type_categories)}") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    MCoreTextField(value = name, onValueChange = { name = it }, label = stringResource(R.string.name))
+                    MCoreTextField(value = name, onValueChange = { name = it }, label = stringResource(R.string.name), isError = showError && name.isBlank())
                     MCoreTextField(value = description, onValueChange = { description = it }, label = stringResource(R.string.description))
+                    AnimatedFeedback(visible = showError, message = stringResource(R.string.validation_error), isError = true)
                 }
             },
             confirmButton = {
                 TextButton(onClick = {
-                    if (name.isNotBlank()) {
-                        viewModelGlobal?.room?.typeCategory?.insert(
-                            TypeCategoryModel(organismId = organismId, name = name, description = description)
-                        )
-                        name = ""
-                        description = ""
-                        showDialog = false
-                    }
+                    if (name.isBlank()) { showError = true; return@TextButton }
+                    viewModelGlobal?.room?.typeCategory?.insert(
+                        TypeCategoryModel(organismId = organismId, name = name, description = description)
+                    )
+                    name = ""
+                    description = ""
+                    showError = false
+                    showDialog = false
+                    scope.launch { snackbarHost.showSnackbar(addedMsg) }
                 }) { Text(stringResource(R.string.save), color = MaterialTheme.colorScheme.primary) }
             },
             dismissButton = {

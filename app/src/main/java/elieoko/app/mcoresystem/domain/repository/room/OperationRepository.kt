@@ -21,6 +21,12 @@ class OperationRepository(private val dataDao: IOperationDao) {
     @WorkerThread
     fun allOperationDayCDF(dateCurrent: String, currencyId : Int, userId : Int) : Int? = dataDao.getOperationToDayCDF(dateCurrent, currencyId, userId)
 
+    @WorkerThread
+    fun pendingOperations() : List<OperationRelation> = dataDao.getPendingOperations()
+
+    @WorkerThread
+    suspend fun updateStatus(operationId: Int, status: String) = dataDao.updateStatus(operationId, status)
+
     @Suppress("RedundantSuspendModifier")
     @WorkerThread
     suspend fun insert(data: OperationModel): Long {
