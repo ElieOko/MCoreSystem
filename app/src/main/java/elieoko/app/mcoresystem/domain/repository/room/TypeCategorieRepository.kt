@@ -23,4 +23,9 @@ class TypeCategorieRepository(private val dataDao: ITypeCategoryDao) {
     suspend fun update(data: TypeCategoryModel) {
         dataDao.updateAll(data)
     }
+
+    @WorkerThread
+    suspend fun delete(data: TypeCategoryModel) {
+        dataDao.delete(data)
+    }
 }

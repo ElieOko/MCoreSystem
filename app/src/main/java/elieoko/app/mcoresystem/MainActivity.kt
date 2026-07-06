@@ -49,7 +49,8 @@ class MainActivity : ComponentActivity() {
                             operationViewModel = operationViewModel,
                             categoryViewModel = categoryViewModel,
                             typeCategoryViewModel = typeCategoryViewModel
-                        )
+                        ),
+                        exchangeRateRepository = (application as MCoreApplication).exchangeRateRepository
                     )
                 }
                 applicationViewModel.room.currency = currencyViewModel

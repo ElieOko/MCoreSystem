@@ -33,4 +33,9 @@ class OperationRepository(private val dataDao: IOperationDao) {
     suspend fun update(data: OperationModel) {
         dataDao.updateAll(data)
     }
+
+    @WorkerThread
+    suspend fun delete(data: OperationModel) {
+        dataDao.delete(data)
+    }
 }

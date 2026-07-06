@@ -17,4 +17,9 @@ class CurrencyRepository(private val currencyDao: ICurrencyDao) {
     suspend fun update(currencies: CurrencyModel) {
         currencyDao.updateAll(currencies)
     }
+
+    @WorkerThread
+    suspend fun delete(currencies: CurrencyModel) {
+        currencyDao.delete(currencies)
+    }
 }

@@ -44,10 +44,7 @@ fun TypeCategoryPage(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = { showDialog = true },
-                containerColor = MaterialTheme.colorScheme.primary
-            ) {
+            FloatingActionButton(onClick = { showDialog = true }, containerColor = MaterialTheme.colorScheme.primary) {
                 Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add))
             }
         },
@@ -63,8 +60,11 @@ fun TypeCategoryPage(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 contentPadding = PaddingValues(vertical = 16.dp)
             ) {
-                items(typeCategories) { type ->
-                    TypeCategoryListItem(type)
+                items(typeCategories, key = { it.id }) { type ->
+                    TypeCategoryListItem(
+                        type = type,
+                        onDelete = { viewModelGlobal?.room?.typeCategory?.delete(type) }
+                    )
                 }
             }
         }
@@ -100,27 +100,19 @@ fun TypeCategoryPage(
 }
 
 @Composable
-private fun TypeCategoryListItem(type: TypeCategoryModel) {
-    MCoreCard {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(Modifier.weight(1f)) {
-                Text(text = type.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Text(text = type.description.ifBlank { "—" }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            AssistChip(
-                onClick = {},
-                label = {
-                    Text(if (type.isActive) stringResource(R.string.active) else stringResource(R.string.inactive))
-                },
-                colors = AssistChipDefaults.assistChipColors(
-                    containerColor = if (type.isActive) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
-                    labelColor = if (type.isActive) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            )
+private fun TypeCategoryListItem(type: TypeCategoryModel, onDelete: () -> Unit) {
+    DeleteableListItem(onDelete = onDelete) {
+        Column(Modifier.weight(1f).padding(vertical = 8.dp)) {
+            Text(type.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(type.description.ifBlank { "—" }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
+        AssistChip(
+            onClick = {},
+            label = { Text(if (type.isActive) stringResource(R.string.active) else stringResource(R.string.inactive)) },
+            colors = AssistChipDefaults.assistChipColors(
+                containerColor = if (type.isActive) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+                labelColor = if (type.isActive) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        )
     }
 }

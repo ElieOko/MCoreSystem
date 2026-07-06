@@ -4,8 +4,8 @@ import android.content.Context
 import android.util.Log
 import androidx.room.*
 import androidx.sqlite.db.SupportSQLiteDatabase
+import elieoko.app.mcoresystem.data.preferences.ExchangeRateRepository
 import elieoko.app.mcoresystem.domain.interfaces.room.*
-import elieoko.app.mcoresystem.domain.interfaces.room.IUserDao
 import elieoko.app.mcoresystem.domain.model.room.*
 import kotlinx.coroutines.*
 import java.util.concurrent.Executors
@@ -24,8 +24,6 @@ abstract class MCoreRoomDatabase : RoomDatabase() {
         @Volatile
         private var INSTANCE: MCoreRoomDatabase? = null
         fun getDatabase(context: Context, scope: CoroutineScope): MCoreRoomDatabase {
-            // if the INSTANCE is not null, then return it,
-            // if it is, then create the database
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
@@ -35,8 +33,6 @@ abstract class MCoreRoomDatabase : RoomDatabase() {
                     .setQueryCallback({ sqlQuery, bindArgs ->
                         Log.d("ROOM_SQL", "SQL Query: $sqlQuery SQL Args: $bindArgs")
                     }, Executors.newSingleThreadExecutor())
-                    //.addMigrations(migrations = (8,9))
-                    //.allowMainThreadQueries()
                     .addCallback(MCoreDatabaseCallback(scope))
                     .addCallback(object : Callback() {
                         override fun onOpen(db: SupportSQLiteDatabase) {
@@ -56,10 +52,46 @@ abstract class MCoreRoomDatabase : RoomDatabase() {
     ) : Callback() {
         override fun onCreate(db: SupportSQLiteDatabase) {
             super.onCreate(db)
-            INSTANCE?.let { database->
-                scope.launch {}
-            }
+            INSTANCE?.let { database -> scope.launch { seedDefaults(database) } }
         }
 
+        override fun onOpen(db: SupportSQLiteDatabase) {
+            super.onOpen(db)
+            INSTANCE?.let { database -> scope.launch { seedDefaults(database) } }
+        }
+
+        private suspend fun seedDefaults(database: MCoreRoomDatabase) {
+            withContext(Dispatchers.IO) {
+                val currencyDao = database.currencyDao()
+                if (currencyDao.getAll().isEmpty()) {
+                    currencyDao.insertAll(
+                        CurrencyModel(
+                            id = ExchangeRateRepository.CURRENCY_CDF_ID,
+                            name = "Franc Congolais",
+                            code = ExchangeRateRepository.CURRENCY_CDF_CODE,
+                            symbol = "FC"
+                        ),
+                        CurrencyModel(
+                            id = ExchangeRateRepository.CURRENCY_USD_ID,
+                            name = "Dollar Américain",
+                            code = ExchangeRateRepository.CURRENCY_USD_CODE,
+                            symbol = "$"
+                        )
+                    )
+                }
+                val paymentDao = database.paymentMethodDao()
+                if (paymentDao.getAll().isEmpty()) {
+                    paymentDao.insertAll(
+                        PaymentMethodModel(id = 1, name = "Espèces"),
+                        PaymentMethodModel(id = 2, name = "Mobile Money"),
+                        PaymentMethodModel(id = 3, name = "Virement bancaire")
+                    )
+                }
+                val organismDao = database.organismDao()
+                if (organismDao.getAll().isEmpty()) {
+                    organismDao.insertAll(OrganismModel(id = 1, name = "MCoreSystem"))
+                }
+            }
+        }
     }
 }

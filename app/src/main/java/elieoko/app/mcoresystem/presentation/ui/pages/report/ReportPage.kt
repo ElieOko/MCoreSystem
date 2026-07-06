@@ -14,6 +14,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import elieoko.app.mcoresystem.R
+import elieoko.app.mcoresystem.data.preferences.ExchangeRateRepository
+import elieoko.app.mcoresystem.domain.util.CurrencyConverter
 import elieoko.app.mcoresystem.domain.viewmodel.config.ApplicationViewModel
 import elieoko.app.mcoresystem.presentation.components.element.MCoreCard
 import elieoko.app.mcoresystem.presentation.components.element.Space
@@ -34,15 +36,24 @@ fun ReportPage(
         ?: remember { mutableIntStateOf(0) }
     val categories by viewModelGlobal?.room?.category?.listCategories?.collectAsState()
         ?: remember { mutableStateOf(emptyList()) }
+    val usdToCdfRate by viewModelGlobal?.usdToCdfRate?.collectAsState()
+        ?: remember { mutableDoubleStateOf(ExchangeRateRepository.DEFAULT_RATE) }
     val dateToday = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date()) }
 
     LaunchedEffect(userId) {
         viewModelGlobal?.room?.operation?.getAllOperation(userId)
-        viewModelGlobal?.room?.operation?.getAllOperationToDay(dateToday, 1, userId)
+        viewModelGlobal?.room?.operation?.getAllOperationToDay(dateToday, ExchangeRateRepository.CURRENCY_CDF_ID, userId)
         viewModelGlobal?.room?.category?.getAll()
     }
 
-    val totalAmount = operations.sumOf { it.operation?.amount ?: 0.0 }
+    val totalCdf = operations.sumOf { op ->
+        CurrencyConverter.toCDF(
+            op.operation?.amount ?: 0.0,
+            op.currency?.code ?: ExchangeRateRepository.CURRENCY_CDF_CODE,
+            usdToCdfRate
+        )
+    }
+    val totalUsd = CurrencyConverter.toUSD(totalCdf, ExchangeRateRepository.CURRENCY_CDF_CODE, usdToCdfRate)
     val activeOperations = operations.count { it.operation?.isActive == true }
 
     Scaffold(
@@ -93,18 +104,25 @@ fun ReportPage(
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 ReportStatCard(
-                    title = stringResource(R.string.total_amount),
-                    value = String.format(Locale.getDefault(), "%.2f", totalAmount),
+                    title = stringResource(R.string.currency_cdf),
+                    value = CurrencyConverter.formatCDF(totalCdf),
                     icon = Icons.Default.AttachMoney,
                     modifier = Modifier.weight(1f)
                 )
                 ReportStatCard(
-                    title = stringResource(R.string.active),
-                    value = "$activeOperations",
-                    icon = Icons.Default.CheckCircle,
+                    title = stringResource(R.string.currency_usd),
+                    value = CurrencyConverter.formatUSD(totalUsd),
+                    icon = Icons.Default.MonetizationOn,
                     modifier = Modifier.weight(1f)
                 )
             }
+            Space(y = 12)
+            ReportStatCard(
+                title = stringResource(R.string.active),
+                value = "$activeOperations",
+                icon = Icons.Default.CheckCircle,
+                modifier = Modifier.fillMaxWidth()
+            )
             Space(y = 20)
             MCoreCard {
                 Column(Modifier.padding(20.dp)) {
@@ -119,18 +137,32 @@ fun ReportPage(
                         Text(stringResource(R.string.no_data), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     } else {
                         categories.forEach { category ->
-                            val count = operations.count { it.category?.id == category.id }
+                            val categoryOps = operations.filter { it.category?.id == category.id }
+                            val categoryTotal = categoryOps.sumOf { op ->
+                                CurrencyConverter.toCDF(
+                                    op.operation?.amount ?: 0.0,
+                                    op.currency?.code ?: ExchangeRateRepository.CURRENCY_CDF_CODE,
+                                    usdToCdfRate
+                                )
+                            }
                             Row(
                                 modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Text(category.name, style = MaterialTheme.typography.bodyMedium)
-                                Text(
-                                    "$count op.",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text(
+                                        "${categoryOps.size} op.",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Text(
+                                        CurrencyConverter.formatCDF(categoryTotal),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
                             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
                         }
@@ -141,15 +173,21 @@ fun ReportPage(
             MCoreCard {
                 Column(Modifier.padding(20.dp)) {
                     Text(
-                        text = stringResource(R.string.date),
+                        text = stringResource(R.string.exchange_rate),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.primary
                     )
                     Space(y = 8)
                     Text(
-                        text = SimpleDateFormat("EEEE dd MMMM yyyy", Locale.FRENCH).format(Date()),
+                        text = "1 USD = ${CurrencyConverter.formatCDF(usdToCdfRate)}",
                         style = MaterialTheme.typography.bodyLarge
+                    )
+                    Space(y = 8)
+                    Text(
+                        text = SimpleDateFormat("EEEE dd MMMM yyyy", Locale.FRENCH).format(Date()),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -170,7 +208,7 @@ private fun ReportStatCard(title: String, value: String, icon: ImageVector, modi
         ) {
             Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp))
             Space(y = 8)
-            Text(value, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
+            Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
             Text(title, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimaryContainer)
         }
     }

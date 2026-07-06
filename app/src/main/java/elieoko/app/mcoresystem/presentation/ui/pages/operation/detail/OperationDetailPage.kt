@@ -10,6 +10,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import elieoko.app.mcoresystem.R
+import elieoko.app.mcoresystem.data.preferences.ExchangeRateRepository
+import elieoko.app.mcoresystem.domain.util.CurrencyConverter
 import elieoko.app.mcoresystem.domain.viewmodel.config.ApplicationViewModel
 import elieoko.app.mcoresystem.presentation.components.element.MCoreCard
 import elieoko.app.mcoresystem.presentation.components.element.Space
@@ -23,10 +25,16 @@ fun OperationDetailPage(
 ) {
     val operationDetail by viewModelGlobal?.room?.operation?.operationDetail?.collectAsState()
         ?: remember { mutableStateOf(null) }
+    val usdToCdfRate by viewModelGlobal?.usdToCdfRate?.collectAsState()
+        ?: remember { mutableDoubleStateOf(ExchangeRateRepository.DEFAULT_RATE) }
 
     LaunchedEffect(operationId) {
         operationId?.let { viewModelGlobal?.room?.operation?.getDetailOperation(it) }
     }
+
+    val amount = operationDetail?.operation?.amount ?: 0.0
+    val currencyCode = operationDetail?.currency?.code ?: ExchangeRateRepository.CURRENCY_CDF_CODE
+    val conversion = CurrencyConverter.conversionLabel(amount, currencyCode, usdToCdfRate)
 
     Scaffold(
         topBar = {
@@ -55,7 +63,13 @@ fun OperationDetailPage(
                         color = MaterialTheme.colorScheme.primary
                     )
                     Space(y = 16)
-                    DetailRow(stringResource(R.string.amount), "${operationDetail?.currency?.symbol ?: ""} ${operationDetail?.operation?.amount ?: 0.0}")
+                    DetailRow(
+                        stringResource(R.string.amount),
+                        "${operationDetail?.currency?.symbol ?: ""} $amount"
+                    )
+                    if (conversion.isNotBlank()) {
+                        DetailRow(stringResource(R.string.conversion_preview), conversion)
+                    }
                     DetailRow(stringResource(R.string.description), operationDetail?.operation?.description ?: "—")
                     DetailRow(stringResource(R.string.category), operationDetail?.category?.name ?: "—")
                     DetailRow(stringResource(R.string.payment_method), operationDetail?.paymentMethod?.name ?: "—")

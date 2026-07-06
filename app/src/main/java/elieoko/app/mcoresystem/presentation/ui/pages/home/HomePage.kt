@@ -25,9 +25,10 @@ import elieoko.app.mcoresystem.domain.model.MenuItem
 import elieoko.app.mcoresystem.domain.route.ScreenRoute
 import elieoko.app.mcoresystem.domain.viewmodel.config.ApplicationViewModel
 import elieoko.app.mcoresystem.presentation.components.element.*
-import elieoko.app.mcoresystem.presentation.ui.theme.MCoreSystemTheme
-import elieoko.app.mcoresystem.presentation.ui.theme.OrangePrimary
-import elieoko.app.mcoresystem.presentation.ui.theme.OrangePrimaryDark
+import elieoko.app.mcoresystem.data.preferences.ExchangeRateRepository
+import elieoko.app.mcoresystem.domain.util.CurrencyConverter
+import elieoko.app.mcoresystem.presentation.ui.theme.BluePrimary
+import elieoko.app.mcoresystem.presentation.ui.theme.BluePrimaryDark
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -46,11 +47,23 @@ fun HomePage(navC: NavHostController? = null, viewModelGlobal: ApplicationViewMo
     val userId = viewModelGlobal?.currentUserId?.intValue ?: 1
     val operationsToday by viewModelGlobal?.room?.operation?.listOperationToday?.collectAsState()
         ?: remember { mutableIntStateOf(0) }
+    val operations by viewModelGlobal?.room?.operation?.listOperation?.collectAsState()
+        ?: remember { mutableStateOf(emptyList()) }
+    val usdToCdfRate by viewModelGlobal?.usdToCdfRate?.collectAsState()
+        ?: remember { mutableDoubleStateOf(ExchangeRateRepository.DEFAULT_RATE) }
     val dateToday = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date()) }
+
+    val totalCdf = operations.sumOf { op ->
+        CurrencyConverter.toCDF(
+            op.operation?.amount ?: 0.0,
+            op.currency?.code ?: ExchangeRateRepository.CURRENCY_CDF_CODE,
+            usdToCdfRate
+        )
+    }
 
     LaunchedEffect(userId) {
         viewModelGlobal?.room?.operation?.getAllOperation(userId)
-        viewModelGlobal?.room?.operation?.getAllOperationToDay(dateToday, 1, userId)
+        viewModelGlobal?.room?.operation?.getAllOperationToDay(dateToday, ExchangeRateRepository.CURRENCY_CDF_ID, userId)
     }
 
     val menuItems = listOf(
@@ -133,7 +146,7 @@ fun HomePage(navC: NavHostController? = null, viewModelGlobal: ApplicationViewMo
                         )
                         StatCard(
                             title = stringResource(R.string.total_amount),
-                            value = "—",
+                            value = CurrencyConverter.formatCDF(totalCdf),
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -210,7 +223,7 @@ private fun QuickAccessCard(title: String, icon: ImageVector, onClick: () -> Uni
                 modifier = Modifier
                     .size(40.dp)
                     .background(
-                        Brush.linearGradient(listOf(OrangePrimary, OrangePrimaryDark)),
+                        Brush.linearGradient(listOf(BluePrimary, BluePrimaryDark)),
                         RoundedCornerShape(12.dp)
                     ),
                 contentAlignment = Alignment.Center
