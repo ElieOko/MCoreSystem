@@ -42,7 +42,9 @@ class PaymentMethodViewModel(private val repository: PaymentMethodRepository) : 
     }
 
     private suspend fun refresh() {
-        _listPaymentMethod.value = repository.allPaymentMethod()
+        withContext(Dispatchers.IO) {
+            _listPaymentMethod.value = repository.allPaymentMethod()
+        }
     }
 }
 
