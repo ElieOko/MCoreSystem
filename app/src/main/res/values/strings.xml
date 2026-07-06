@@ -50,4 +50,16 @@
     <string name="login_error">Identifiants incorrects</string>
     <string name="field_required">Ce champ est requis</string>
     <string name="register_success">Compte créé avec succès</string>
+    <string name="delete">Supprimer</string>
+    <string name="delete_confirm_title">Confirmer la suppression</string>
+    <string name="delete_confirm_message">Voulez-vous vraiment supprimer cet élément ?</string>
+    <string name="exchange_rate">Taux de change</string>
+    <string name="exchange_rate_label">1 USD =</string>
+    <string name="exchange_rate_cdf">Francs congolais (CDF)</string>
+    <string name="exchange_rate_hint">Modifiez le taux pour convertir automatiquement USD ↔ CDF</string>
+    <string name="conversion_preview">Aperçu de conversion</string>
+    <string name="currency_cdf">Franc Congolais (CDF)</string>
+    <string name="currency_usd">Dollar Américain (USD)</string>
+    <string name="save_rate">Enregistrer le taux</string>
+    <string name="rate_saved">Taux enregistré</string>
 </resources>

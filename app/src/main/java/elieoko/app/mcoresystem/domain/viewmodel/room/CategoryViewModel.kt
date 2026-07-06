@@ -4,9 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import elieoko.app.mcoresystem.domain.model.room.CategoryModel
-import elieoko.app.mcoresystem.domain.model.room.CurrencyModel
 import elieoko.app.mcoresystem.domain.repository.room.CategorieRepository
-import elieoko.app.mcoresystem.domain.repository.room.CurrencyRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -18,23 +16,33 @@ class CategoryViewModel(private val repository: CategorieRepository) : ViewModel
     val listCategories get() = _listCategory.asStateFlow()
 
     fun getAll() = viewModelScope.launch {
-        withContext(Dispatchers.IO) {
-            _listCategory.value = repository.allData()
-        }
+        refresh()
     }
 
-    fun insert(data : CategoryModel) = viewModelScope.launch {
+    fun insert(data: CategoryModel) = viewModelScope.launch {
         withContext(Dispatchers.IO) {
             repository.insert(data)
+            refresh()
         }
     }
 
-    fun update(data : CategoryModel) = viewModelScope.launch {
+    fun update(data: CategoryModel) = viewModelScope.launch {
         withContext(Dispatchers.IO) {
             repository.update(data)
+            refresh()
         }
     }
 
+    fun delete(data: CategoryModel) = viewModelScope.launch {
+        withContext(Dispatchers.IO) {
+            repository.delete(data)
+            refresh()
+        }
+    }
+
+    private suspend fun refresh() {
+        _listCategory.value = repository.allData()
+    }
 }
 
 class CategoryViewModelFactory(private val repository: CategorieRepository) : ViewModelProvider.Factory {

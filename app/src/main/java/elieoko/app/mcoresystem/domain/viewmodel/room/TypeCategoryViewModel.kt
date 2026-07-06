@@ -3,7 +3,6 @@ package elieoko.app.mcoresystem.domain.viewmodel.room
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import elieoko.app.mcoresystem.domain.model.room.CategoryModel
 import elieoko.app.mcoresystem.domain.model.room.TypeCategoryModel
 import elieoko.app.mcoresystem.domain.repository.room.TypeCategorieRepository
 import kotlinx.coroutines.Dispatchers
@@ -17,26 +16,36 @@ class TypeCategoryViewModel(private val repository: TypeCategorieRepository) : V
     val listTypeCategories get() = _listTypeCategory.asStateFlow()
 
     fun getAll() = viewModelScope.launch {
-        withContext(Dispatchers.IO) {
-            _listTypeCategory.value = repository.allData()
-        }
+        refresh()
     }
 
-    fun insert(data : TypeCategoryModel) = viewModelScope.launch {
+    fun insert(data: TypeCategoryModel) = viewModelScope.launch {
         withContext(Dispatchers.IO) {
             repository.insert(data)
+            refresh()
         }
     }
 
-    fun update(data : TypeCategoryModel) = viewModelScope.launch {
+    fun update(data: TypeCategoryModel) = viewModelScope.launch {
         withContext(Dispatchers.IO) {
             repository.update(data)
+            refresh()
         }
     }
 
+    fun delete(data: TypeCategoryModel) = viewModelScope.launch {
+        withContext(Dispatchers.IO) {
+            repository.delete(data)
+            refresh()
+        }
+    }
+
+    private suspend fun refresh() {
+        _listTypeCategory.value = repository.allData()
+    }
 }
 
-class TypeCategoryViewModelFactory(private val repository:TypeCategorieRepository) : ViewModelProvider.Factory {
+class TypeCategoryViewModelFactory(private val repository: TypeCategorieRepository) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(TypeCategoryViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")

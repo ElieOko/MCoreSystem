@@ -26,8 +26,8 @@ import elieoko.app.mcoresystem.presentation.components.element.MCoreOutlinedButt
 import elieoko.app.mcoresystem.presentation.components.element.MCoreTextField
 import elieoko.app.mcoresystem.presentation.components.element.Space
 import elieoko.app.mcoresystem.presentation.ui.theme.MCoreSystemTheme
-import elieoko.app.mcoresystem.presentation.ui.theme.OrangePrimary
-import elieoko.app.mcoresystem.presentation.ui.theme.OrangePrimaryDark
+import elieoko.app.mcoresystem.presentation.ui.theme.BluePrimary
+import elieoko.app.mcoresystem.presentation.ui.theme.BluePrimaryDark
 
 @Composable
 fun LoginPage(
@@ -56,7 +56,7 @@ fun LoginPage(
             .fillMaxSize()
             .background(
                 Brush.verticalGradient(
-                    colors = listOf(OrangePrimary, OrangePrimaryDark)
+                    colors = listOf(BluePrimary, BluePrimaryDark)
                 )
             )
     ) {

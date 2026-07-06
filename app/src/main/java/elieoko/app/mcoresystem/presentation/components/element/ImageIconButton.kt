@@ -20,8 +20,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import elieoko.app.mcoresystem.presentation.ui.theme.MCoreSystemTheme
-import elieoko.app.mcoresystem.presentation.ui.theme.OrangePrimary
-import elieoko.app.mcoresystem.presentation.ui.theme.OrangePrimaryDark
+import elieoko.app.mcoresystem.presentation.ui.theme.BluePrimary
+import elieoko.app.mcoresystem.presentation.ui.theme.BluePrimaryDark
 import elieoko.app.mcoresystem.presentation.ui.theme.bagdeColor
 
 @Composable
@@ -41,7 +41,7 @@ fun ImageIconButton(onclick: () -> Unit = {}) {
                 .clip(RoundedCornerShape(60.dp))
                 .background(
                     Brush.linearGradient(
-                        colors = listOf(OrangePrimary, OrangePrimaryDark)
+                        colors = listOf(BluePrimary, BluePrimaryDark)
                     )
                 ),
             contentAlignment = Alignment.Center

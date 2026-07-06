@@ -16,23 +16,33 @@ class CurrencyViewModel(private val repository: CurrencyRepository) : ViewModel(
     val listCurrencies get() = _listCurrencies.asStateFlow()
 
     fun getAllCurrencies() = viewModelScope.launch {
-        withContext(Dispatchers.IO) {
-            _listCurrencies.value = repository.allCurrency()
-        }
+        refresh()
     }
 
-    fun insert(currency : CurrencyModel) = viewModelScope.launch {
+    fun insert(currency: CurrencyModel) = viewModelScope.launch {
         withContext(Dispatchers.IO) {
             repository.insert(currency)
+            refresh()
         }
     }
 
-    fun update(currency : CurrencyModel) = viewModelScope.launch {
+    fun update(currency: CurrencyModel) = viewModelScope.launch {
         withContext(Dispatchers.IO) {
             repository.update(currency)
+            refresh()
         }
     }
 
+    fun delete(currency: CurrencyModel) = viewModelScope.launch {
+        withContext(Dispatchers.IO) {
+            repository.delete(currency)
+            refresh()
+        }
+    }
+
+    private suspend fun refresh() {
+        _listCurrencies.value = repository.allCurrency()
+    }
 }
 
 class CurrencyViewModelFactory(private val repository: CurrencyRepository) : ViewModelProvider.Factory {

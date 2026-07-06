@@ -14,6 +14,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import elieoko.app.mcoresystem.R
 import elieoko.app.mcoresystem.domain.model.room.CategoryModel
+import elieoko.app.mcoresystem.domain.model.room.TypeCategoryModel
 import elieoko.app.mcoresystem.domain.viewmodel.config.ApplicationViewModel
 import elieoko.app.mcoresystem.presentation.components.element.*
 
@@ -56,10 +57,7 @@ fun CategoryPage(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = { showDialog = true },
-                containerColor = MaterialTheme.colorScheme.primary
-            ) {
+            FloatingActionButton(onClick = { showDialog = true }, containerColor = MaterialTheme.colorScheme.primary) {
                 Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add))
             }
         },
@@ -75,8 +73,12 @@ fun CategoryPage(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 contentPadding = PaddingValues(vertical = 16.dp)
             ) {
-                items(categories) { category ->
-                    CategoryListItem(category, typeCategories)
+                items(categories, key = { it.id }) { category ->
+                    CategoryListItem(
+                        category = category,
+                        typeCategories = typeCategories,
+                        onDelete = { viewModelGlobal?.room?.category?.delete(category) }
+                    )
                 }
             }
         }
@@ -130,12 +132,16 @@ fun CategoryPage(
 }
 
 @Composable
-private fun CategoryListItem(category: CategoryModel, typeCategories: List<elieoko.app.mcoresystem.domain.model.room.TypeCategoryModel>) {
+private fun CategoryListItem(
+    category: CategoryModel,
+    typeCategories: List<TypeCategoryModel>,
+    onDelete: () -> Unit
+) {
     val typeName = typeCategories.find { it.id == category.typeCategoryId }?.name ?: "—"
-    MCoreCard {
-        Column(Modifier.padding(16.dp)) {
-            Text(text = category.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            Text(text = category.description.ifBlank { "—" }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    DeleteableListItem(onDelete = onDelete) {
+        Column(Modifier.weight(1f).padding(vertical = 8.dp)) {
+            Text(category.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(category.description.ifBlank { "—" }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Space(y = 4)
             AssistChip(
                 onClick = {},

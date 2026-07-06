@@ -66,6 +66,12 @@ class OperationViewModel(private val repository: OperationRepository) : ViewMode
             repository.update(operation)
         }
     }
+
+    fun delete(operation: OperationModel) = viewModelScope.launch {
+        withContext(Dispatchers.IO) {
+            repository.delete(operation)
+        }
+    }
 }
 
 class OperationViewModelFactory(private val repository: OperationRepository) : ViewModelProvider.Factory {

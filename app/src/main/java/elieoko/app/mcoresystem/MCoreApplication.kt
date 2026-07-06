@@ -1,6 +1,7 @@
 package elieoko.app.mcoresystem
 
 import android.app.*
+import elieoko.app.mcoresystem.data.preferences.ExchangeRateRepository
 import elieoko.app.mcoresystem.data.room.*
 import elieoko.app.mcoresystem.domain.repository.room.*
 import kotlinx.coroutines.*
@@ -15,6 +16,7 @@ class MCoreApplication : Application() {
     val typeCategoryRepository by lazy { TypeCategorieRepository(database.typeCategoryDao()) }
     val operationRepository by lazy { OperationRepository(database.operationDao()) }
     val organismRepository by lazy { OrganismRepository(database.organismDao()) }
+    val exchangeRateRepository by lazy { ExchangeRateRepository(this) }
 
 
 }

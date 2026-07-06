@@ -1,6 +1,5 @@
 package elieoko.app.mcoresystem.presentation.ui.theme
 
-import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
@@ -9,37 +8,37 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
 private val DarkColorScheme = darkColorScheme(
-    primary = OrangeDarkPrimary,
-    onPrimary = OrangeOnBackground,
-    primaryContainer = OrangePrimaryDark,
-    onPrimaryContainer = OrangePrimaryLight,
-    secondary = OrangeDarkSecondary,
-    onSecondary = OrangeOnBackground,
-    tertiary = OrangeDarkTertiary,
-    background = OrangeDarkBackground,
-    onBackground = Color(0xFFF5EDE4),
-    surface = OrangeDarkSurface,
-    onSurface = Color(0xFFF5EDE4),
-    surfaceVariant = OrangeDarkSurfaceVariant,
-    onSurfaceVariant = OrangePrimaryLight,
-    outline = OrangeOutline
+    primary = BlueDarkPrimary,
+    onPrimary = BlueDarkBackground,
+    primaryContainer = BluePrimaryDark,
+    onPrimaryContainer = BluePrimaryLight,
+    secondary = BlueDarkSecondary,
+    onSecondary = BlueDarkBackground,
+    tertiary = BlueDarkTertiary,
+    background = BlueDarkBackground,
+    onBackground = Color(0xFFE8EEF5),
+    surface = BlueDarkSurface,
+    onSurface = Color(0xFFE8EEF5),
+    surfaceVariant = BlueDarkSurfaceVariant,
+    onSurfaceVariant = BluePrimaryLight,
+    outline = BlueOutline
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = OrangePrimary,
-    onPrimary = OrangeOnPrimary,
-    primaryContainer = OrangePrimaryLight,
-    onPrimaryContainer = OrangePrimaryDark,
-    secondary = OrangeSecondary,
-    onSecondary = OrangeOnPrimary,
-    tertiary = OrangeTertiary,
-    background = OrangeBackground,
-    onBackground = OrangeOnBackground,
-    surface = OrangeSurface,
-    onSurface = OrangeOnSurface,
-    surfaceVariant = OrangeSurfaceVariant,
-    onSurfaceVariant = OrangePrimaryDark,
-    outline = OrangeOutline
+    primary = BluePrimary,
+    onPrimary = BlueOnPrimary,
+    primaryContainer = BluePrimaryLight,
+    onPrimaryContainer = BluePrimaryDark,
+    secondary = BlueSecondary,
+    onSecondary = BlueOnPrimary,
+    tertiary = BlueTertiary,
+    background = BlueBackground,
+    onBackground = BlueOnBackground,
+    surface = BlueSurface,
+    onSurface = BlueOnSurface,
+    surfaceVariant = BlueSurfaceVariant,
+    onSurfaceVariant = BluePrimaryDark,
+    outline = BlueOutline
 )
 
 @Composable
