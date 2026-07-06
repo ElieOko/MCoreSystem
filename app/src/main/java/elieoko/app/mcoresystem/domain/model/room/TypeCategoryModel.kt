@@ -24,7 +24,11 @@ data class TypeCategoryModel(
     @ColumnInfo(name = "description")
     val description : String = "",
     @ColumnInfo(name = "is_active")
-    val isActive : Boolean = true
+    val isActive : Boolean = true,
+    @ColumnInfo(name = "uuid", defaultValue = "")
+    val uuid : String = java.util.UUID.randomUUID().toString(),
+    @ColumnInfo(name = "updated_at", defaultValue = "")
+    val updatedAt : String = ""
 ){
     fun asDataSelect(item: List<TypeCategoryModel>?) : List<DataSelect>{
         val listDataSelect = mutableListOf<DataSelect>()

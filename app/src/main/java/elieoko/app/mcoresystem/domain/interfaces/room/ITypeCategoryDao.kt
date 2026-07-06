@@ -10,6 +10,12 @@ interface ITypeCategoryDao {
     @Query("SELECT * FROM TTypeCategory")
     fun getAll(): List<TypeCategoryModel>
 
+    @Query("SELECT * FROM TTypeCategory WHERE uuid = :uuid LIMIT 1")
+    fun findByUuid(uuid: String): TypeCategoryModel?
+
+    @Query("SELECT * FROM TTypeCategory WHERE type_category_id = :id LIMIT 1")
+    fun findById(id: Int): TypeCategoryModel?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(vararg typeCategoryModel: TypeCategoryModel)
 

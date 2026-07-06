@@ -1,13 +1,13 @@
 package elieoko.app.mcoresystem.presentation.ui.pages.category.type
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -26,6 +26,8 @@ fun TypeCategoryPage(
     val organismId = viewModelGlobal?.currentOrganismId?.intValue ?: 1
     val typeCategories by viewModelGlobal?.room?.typeCategory?.listTypeCategories?.collectAsState()
         ?: remember { mutableStateOf(emptyList()) }
+    val typeError by viewModelGlobal?.room?.typeCategory?.error?.collectAsState()
+        ?: remember { mutableStateOf(null) }
 
     var showDialog by remember { mutableStateOf(false) }
     var name by remember { mutableStateOf("") }
@@ -36,9 +38,17 @@ fun TypeCategoryPage(
     val scope = rememberCoroutineScope()
     val addedMsg = stringResource(R.string.item_added)
     val deletedMsg = stringResource(R.string.item_deleted)
+    val genericError = stringResource(R.string.error_generic)
 
     LaunchedEffect(Unit) {
         viewModelGlobal?.room?.typeCategory?.getAll()
+    }
+
+    LaunchedEffect(typeError) {
+        if (typeError != null) {
+            snackbarHost.showSnackbar(genericError)
+            viewModelGlobal?.room?.typeCategory?.consumeError()
+        }
     }
 
     Scaffold(
@@ -58,26 +68,42 @@ fun TypeCategoryPage(
         },
         containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
-        if (typeCategories.isEmpty()) {
-            Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                EmptyState(message = stringResource(R.string.no_data))
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = PaddingValues(vertical = 16.dp)
-            ) {
-                items(typeCategories, key = { it.id }) { type ->
-                    TypeCategoryListItem(
-                        type = type,
-                        onDelete = {
-                            viewModelGlobal?.room?.typeCategory?.delete(type)
-                            scope.launch { snackbarHost.showSnackbar(deletedMsg) }
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp)
+        ) {
+            SectionHeader(title = stringResource(R.string.type_categories))
+            Space(y = 8)
+            MCoreCard {
+                Column(Modifier.padding(vertical = 4.dp)) {
+                    if (typeCategories.isEmpty()) {
+                        EmptyState(message = stringResource(R.string.no_data))
+                    } else {
+                        typeCategories.forEach { type ->
+                            ManageableRow(
+                                icon = Icons.AutoMirrored.Filled.Label,
+                                title = type.name,
+                                subtitle = type.description.ifBlank { null },
+                                trailing = {
+                                    Text(
+                                        text = if (type.isActive) stringResource(R.string.active) else stringResource(R.string.inactive),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = if (type.isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                },
+                                onDelete = {
+                                    viewModelGlobal?.room?.typeCategory?.delete(type)
+                                    scope.launch { snackbarHost.showSnackbar(deletedMsg) }
+                                }
+                            )
                         }
-                    )
+                    }
                 }
             }
+            Space(y = 80)
         }
     }
 
@@ -102,30 +128,13 @@ fun TypeCategoryPage(
                     description = ""
                     showError = false
                     showDialog = false
+                    viewModelGlobal?.requestSync()
                     scope.launch { snackbarHost.showSnackbar(addedMsg) }
-                }) { Text(stringResource(R.string.save), color = MaterialTheme.colorScheme.primary) }
+                }) { Text(stringResource(R.string.save), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold) }
             },
             dismissButton = {
                 TextButton(onClick = { showDialog = false }) { Text(stringResource(R.string.cancel)) }
             }
-        )
-    }
-}
-
-@Composable
-private fun TypeCategoryListItem(type: TypeCategoryModel, onDelete: () -> Unit) {
-    DeleteableListItem(onDelete = onDelete) {
-        Column(Modifier.weight(1f).padding(vertical = 8.dp)) {
-            Text(type.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            Text(type.description.ifBlank { "—" }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        AssistChip(
-            onClick = {},
-            label = { Text(if (type.isActive) stringResource(R.string.active) else stringResource(R.string.inactive)) },
-            colors = AssistChipDefaults.assistChipColors(
-                containerColor = if (type.isActive) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
-                labelColor = if (type.isActive) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
-            )
         )
     }
 }

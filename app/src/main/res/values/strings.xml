@@ -88,4 +88,26 @@
     <string name="no_currency_hint">Aucune devise. Ajoutez-en une pour continuer.</string>
     <string name="no_category_hint">Aucune catégorie. Créez-en une d\'abord.</string>
     <string name="net_balance">Solde net</string>
+    <string name="organization_section">Organisation</string>
+    <string name="organization_name">Nom de l\'organisation</string>
+    <string name="organization_hint">Créez votre organisation ou rejoignez-en une existante</string>
+    <string name="search_operations">Rechercher une opération…</string>
+    <string name="edit">Modifier</string>
+    <string name="edit_operation">Modifier l\'opération</string>
+    <string name="operation_updated">Opération mise à jour</string>
+    <string name="period_today">Aujourd\'hui</string>
+    <string name="period_week">Cette semaine</string>
+    <string name="period_month">Ce mois</string>
+    <string name="period_year">Cette année</string>
+    <string name="period_custom">Personnalisée</string>
+    <string name="period_all">Tout</string>
+    <string name="start_date">Date de début</string>
+    <string name="end_date">Date de fin</string>
+    <string name="apply">Appliquer</string>
+    <string name="sync_now">Synchroniser maintenant</string>
+    <string name="sync_status_syncing">Synchronisation en cours…</string>
+    <string name="sync_status_success">Données synchronisées</string>
+    <string name="sync_status_error">Erreur de synchronisation, nouvel essai automatique</string>
+    <string name="sync_status_offline">Mode hors ligne — les données seront synchronisées au retour du réseau</string>
+    <string name="error_generic">Une erreur est survenue. Veuillez réessayer.</string>
 </resources>

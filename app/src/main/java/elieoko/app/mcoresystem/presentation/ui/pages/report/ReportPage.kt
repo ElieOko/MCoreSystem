@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -29,6 +30,61 @@ import elieoko.app.mcoresystem.presentation.ui.theme.BluePrimaryDark
 import elieoko.app.mcoresystem.presentation.ui.theme.StatusClosed
 import elieoko.app.mcoresystem.presentation.ui.theme.StatusOpen
 import elieoko.app.mcoresystem.presentation.ui.theme.StatusPending
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
+enum class ReportPeriod(val labelRes: Int) {
+    ALL(R.string.period_all),
+    TODAY(R.string.period_today),
+    WEEK(R.string.period_week),
+    MONTH(R.string.period_month),
+    YEAR(R.string.period_year),
+    CUSTOM(R.string.period_custom)
+}
+
+private fun parseOperationDate(raw: String?): Date? {
+    if (raw.isNullOrBlank()) return null
+    val patterns = listOf("yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd")
+    for (pattern in patterns) {
+        runCatching {
+            return SimpleDateFormat(pattern, Locale.getDefault()).parse(raw)
+        }
+    }
+    return null
+}
+
+private fun periodRange(period: ReportPeriod, customStart: String, customEnd: String): Pair<Date?, Date?> {
+    val calendar = java.util.Calendar.getInstance()
+    fun startOfDay(c: java.util.Calendar): java.util.Calendar = (c.clone() as java.util.Calendar).apply {
+        set(java.util.Calendar.HOUR_OF_DAY, 0); set(java.util.Calendar.MINUTE, 0)
+        set(java.util.Calendar.SECOND, 0); set(java.util.Calendar.MILLISECOND, 0)
+    }
+    return when (period) {
+        ReportPeriod.ALL -> null to null
+        ReportPeriod.TODAY -> startOfDay(calendar).time to null
+        ReportPeriod.WEEK -> startOfDay(calendar).apply {
+            set(java.util.Calendar.DAY_OF_WEEK, firstDayOfWeek)
+        }.time to null
+        ReportPeriod.MONTH -> startOfDay(calendar).apply {
+            set(java.util.Calendar.DAY_OF_MONTH, 1)
+        }.time to null
+        ReportPeriod.YEAR -> startOfDay(calendar).apply {
+            set(java.util.Calendar.DAY_OF_YEAR, 1)
+        }.time to null
+        ReportPeriod.CUSTOM -> {
+            val format = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+            val start = runCatching { format.parse(customStart) }.getOrNull()
+            val end = runCatching { format.parse(customEnd) }.getOrNull()?.let {
+                java.util.Calendar.getInstance().apply {
+                    time = it
+                    set(java.util.Calendar.HOUR_OF_DAY, 23); set(java.util.Calendar.MINUTE, 59); set(java.util.Calendar.SECOND, 59)
+                }.time
+            }
+            start to end
+        }
+    }
+}
 
 @Composable
 fun ReportPage(
@@ -47,8 +103,23 @@ fun ReportPage(
     }
 
     var selectedTab by remember { mutableIntStateOf(0) }
+    var selectedPeriod by remember { mutableStateOf(ReportPeriod.ALL) }
+    var customStart by remember { mutableStateOf("") }
+    var customEnd by remember { mutableStateOf("") }
+    var showCustomDialog by remember { mutableStateOf(false) }
+
     val tabs = listOf(stringResource(R.string.report_cdf), stringResource(R.string.report_usd))
     val currencyCode = if (selectedTab == 0) ExchangeRateRepository.CURRENCY_CDF_CODE else ExchangeRateRepository.CURRENCY_USD_CODE
+
+    // Statistiques recalculées automatiquement à chaque changement de période.
+    val periodFiltered = remember(operations, selectedPeriod, customStart, customEnd) {
+        val (start, end) = periodRange(selectedPeriod, customStart, customEnd)
+        if (start == null && end == null) operations
+        else operations.filter { relation ->
+            val date = parseOperationDate(relation.operation?.createdOn) ?: return@filter false
+            (start == null || !date.before(start)) && (end == null || !date.after(end))
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -71,18 +142,70 @@ fun ReportPage(
                     )
                 }
             }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                ReportPeriod.entries.forEach { period ->
+                    FilterChip(
+                        selected = selectedPeriod == period,
+                        onClick = {
+                            if (period == ReportPeriod.CUSTOM) showCustomDialog = true
+                            else selectedPeriod = period
+                        },
+                        label = { Text(stringResource(period.labelRes)) }
+                    )
+                }
+            }
             AnimatedContent(
                 targetState = currencyCode,
                 transitionSpec = { fadeIn() togetherWith fadeOut() },
                 label = "report-tab"
             ) { code ->
                 CurrencyReport(
-                    operations = operations.filter { it.currency?.code == code },
+                    operations = periodFiltered.filter { it.currency?.code == code },
                     currencyCode = code,
                     usdToCdfRate = usdToCdfRate
                 )
             }
         }
+    }
+
+    if (showCustomDialog) {
+        AlertDialog(
+            onDismissRequest = { showCustomDialog = false },
+            title = { Text(stringResource(R.string.period_custom)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = customStart,
+                        onValueChange = { customStart = it },
+                        label = { Text("${stringResource(R.string.start_date)} (AAAA-MM-JJ)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = customEnd,
+                        onValueChange = { customEnd = it },
+                        label = { Text("${stringResource(R.string.end_date)} (AAAA-MM-JJ)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    selectedPeriod = ReportPeriod.CUSTOM
+                    showCustomDialog = false
+                }) { Text(stringResource(R.string.apply), color = MaterialTheme.colorScheme.primary) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCustomDialog = false }) { Text(stringResource(R.string.cancel)) }
+            }
+        )
     }
 }
 

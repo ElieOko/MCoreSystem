@@ -13,6 +13,12 @@ interface ICurrencyDao {
     @Query("SELECT * FROM TCurrency")
     fun getAll(): List<CurrencyModel>
 
+    @Query("SELECT * FROM TCurrency WHERE uuid = :uuid LIMIT 1")
+    fun findByUuid(uuid: String): CurrencyModel?
+
+    @Query("SELECT * FROM TCurrency WHERE currency_id = :id LIMIT 1")
+    fun findById(id: Int): CurrencyModel?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(vararg currencies: CurrencyModel)
 

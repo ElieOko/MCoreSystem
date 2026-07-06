@@ -10,6 +10,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -61,6 +64,11 @@ fun OperationPage(
     var showCurrencySheet by remember { mutableStateOf(false) }
     var statusFilter by remember { mutableStateOf<OperationStatus?>(null) }
     var statusTarget by remember { mutableStateOf<OperationRelation?>(null) }
+    var editTarget by remember { mutableStateOf<OperationModel?>(null) }
+    var searchQuery by remember { mutableStateOf("") }
+
+    val operationError by viewModelGlobal?.room?.operation?.error?.collectAsState()
+        ?: remember { mutableStateOf(null) }
 
     LaunchedEffect(userId) {
         viewModelGlobal?.room?.operation?.getAllOperation(userId)
@@ -69,14 +77,38 @@ fun OperationPage(
         viewModelGlobal?.room?.paymentMethod?.getAllPaymentMethod()
     }
 
-    val filtered = remember(operations, statusFilter) {
-        if (statusFilter == null) operations
-        else operations.filter { OperationStatus.from(it.operation?.status) == statusFilter }
+    // Recherche instantanée : libellé, catégorie, type, montant, notes, date, statut.
+    val filtered = remember(operations, statusFilter, searchQuery) {
+        val byStatus =
+            if (statusFilter == null) operations
+            else operations.filter { OperationStatus.from(it.operation?.status) == statusFilter }
+        val query = searchQuery.trim().lowercase()
+        if (query.isBlank()) byStatus
+        else byStatus.filter { relation ->
+            val op = relation.operation
+            (op?.taskName?.lowercase()?.contains(query) == true) ||
+                (op?.description?.lowercase()?.contains(query) == true) ||
+                (op?.createdOn?.lowercase()?.contains(query) == true) ||
+                (op?.amount?.toString()?.contains(query) == true) ||
+                (relation.category?.name?.lowercase()?.contains(query) == true) ||
+                (relation.paymentMethod?.name?.lowercase()?.contains(query) == true) ||
+                (relation.currency?.code?.lowercase()?.contains(query) == true) ||
+                OperationStatus.from(op?.status).label.lowercase().contains(query)
+        }
     }
 
     val addedMsg = stringResource(R.string.operation_added)
+    val updatedMsg = stringResource(R.string.operation_updated)
     val deletedMsg = stringResource(R.string.item_deleted)
     val statusMsg = stringResource(R.string.status_updated)
+    val genericError = stringResource(R.string.error_generic)
+
+    LaunchedEffect(operationError) {
+        if (operationError != null) {
+            snackbarHost.showSnackbar(genericError)
+            viewModelGlobal?.room?.operation?.consumeError()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -99,6 +131,24 @@ fun OperationPage(
         containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                placeholder = { Text(stringResource(R.string.search_operations)) },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                trailingIcon = {
+                    if (searchQuery.isNotBlank()) {
+                        IconButton(onClick = { searchQuery = "" }) {
+                            Icon(Icons.Default.Close, contentDescription = null)
+                        }
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
+                singleLine = true
+            )
             StatusFilterRow(statusFilter) { statusFilter = it }
             if (filtered.isEmpty()) {
                 EmptyState(message = stringResource(R.string.no_data))
@@ -114,8 +164,11 @@ fun OperationPage(
                             usdToCdfRate = usdToCdfRate,
                             onClick = { navC?.navigate("${ScreenRoute.OperationDetail.name}/${operation.operation?.id}") },
                             onStatusClick = { statusTarget = operation },
+                            onEdit = { editTarget = operation.operation },
                             onDelete = {
                                 operation.operation?.let { viewModelGlobal?.room?.operation?.delete(it) }
+                                viewModelGlobal?.room?.operation?.getAllOperation(userId)
+                                viewModelGlobal?.requestSync()
                                 scope.launch { snackbarHost.showSnackbar(deletedMsg) }
                             }
                         )
@@ -126,7 +179,7 @@ fun OperationPage(
     }
 
     if (showSheet) {
-        AddOperationSheet(
+        OperationFormSheet(
             categories = categories,
             currencies = currencies,
             paymentMethods = paymentMethods,
@@ -136,7 +189,30 @@ fun OperationPage(
             onSave = { model ->
                 viewModelGlobal?.room?.operation?.insert(model)
                 showSheet = false
+                viewModelGlobal?.room?.operation?.getAllOperation(userId)
+                viewModelGlobal?.requestSync()
                 scope.launch { snackbarHost.showSnackbar(addedMsg) }
+            },
+            organismId = organismId,
+            userId = userId
+        )
+    }
+
+    editTarget?.let { existing ->
+        OperationFormSheet(
+            categories = categories,
+            currencies = currencies,
+            paymentMethods = paymentMethods,
+            usdToCdfRate = usdToCdfRate,
+            existing = existing,
+            onDismiss = { editTarget = null },
+            onCreateCurrency = { editTarget = null; showCurrencySheet = true },
+            onSave = { model ->
+                viewModelGlobal?.room?.operation?.update(model)
+                editTarget = null
+                viewModelGlobal?.room?.operation?.getAllOperation(userId)
+                viewModelGlobal?.requestSync()
+                scope.launch { snackbarHost.showSnackbar(updatedMsg) }
             },
             organismId = organismId,
             userId = userId
@@ -197,25 +273,27 @@ private fun StatusFilterRow(selected: OperationStatus?, onSelect: (OperationStat
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AddOperationSheet(
+private fun OperationFormSheet(
     categories: List<elieoko.app.mcoresystem.domain.model.room.CategoryModel>,
     currencies: List<CurrencyModel>,
     paymentMethods: List<elieoko.app.mcoresystem.domain.model.room.PaymentMethodModel>,
     usdToCdfRate: Double,
     organismId: Int,
     userId: Int,
+    existing: OperationModel? = null,
     onDismiss: () -> Unit,
     onCreateCurrency: () -> Unit,
     onSave: (OperationModel) -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var taskName by remember { mutableStateOf("") }
-    var description by remember { mutableStateOf("") }
-    var amount by remember { mutableStateOf("") }
-    var selectedCategoryId by remember { mutableIntStateOf(categories.firstOrNull()?.id ?: 0) }
-    var selectedCurrencyId by remember { mutableIntStateOf(currencies.firstOrNull()?.id ?: 0) }
-    var selectedPaymentId by remember { mutableIntStateOf(paymentMethods.firstOrNull()?.id ?: 0) }
-    var selectedStatus by remember { mutableStateOf(OperationStatus.OUVERT) }
+    var taskName by remember { mutableStateOf(existing?.taskName ?: "") }
+    var description by remember { mutableStateOf(existing?.description ?: "") }
+    var amount by remember { mutableStateOf(existing?.amount?.takeIf { it > 0 }?.toString() ?: "") }
+    var dateInput by remember { mutableStateOf(existing?.createdOn ?: "") }
+    var selectedCategoryId by remember { mutableIntStateOf(existing?.categoryId ?: categories.firstOrNull()?.id ?: 0) }
+    var selectedCurrencyId by remember { mutableIntStateOf(existing?.currencyId ?: currencies.firstOrNull()?.id ?: 0) }
+    var selectedPaymentId by remember { mutableIntStateOf(existing?.paymentMethodId ?: paymentMethods.firstOrNull()?.id ?: 0) }
+    var selectedStatus by remember { mutableStateOf(OperationStatus.from(existing?.status)) }
     var showError by remember { mutableStateOf(false) }
 
     LaunchedEffect(categories) { if (selectedCategoryId == 0) selectedCategoryId = categories.firstOrNull()?.id ?: 0 }
@@ -232,11 +310,14 @@ private fun AddOperationSheet(
             Modifier
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
+                .imePadding()
                 .padding(horizontal = 20.dp)
                 .padding(bottom = 32.dp)
         ) {
             Text(
-                text = "${stringResource(R.string.add)} ${stringResource(R.string.operations)}",
+                text = if (existing == null)
+                    "${stringResource(R.string.add)} ${stringResource(R.string.operations)}"
+                else stringResource(R.string.edit_operation),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )
@@ -271,6 +352,14 @@ private fun AddOperationSheet(
                     color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Medium,
                     modifier = Modifier.animateContentSize()
+                )
+            }
+            if (existing != null) {
+                Space(y = 8)
+                MCoreTextField(
+                    value = dateInput,
+                    onValueChange = { dateInput = it },
+                    label = stringResource(R.string.date)
                 )
             }
             Space(y = 12)
@@ -318,21 +407,37 @@ private fun AddOperationSheet(
                         return@MCoreButton
                     }
                     val date = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
-                    onSave(
-                        OperationModel(
-                            organismId = organismId,
-                            categoryId = selectedCategoryId,
-                            userId = userId,
-                            paymentMethodId = selectedPaymentId,
-                            currencyId = selectedCurrencyId,
-                            amount = amountValue,
-                            taskName = taskName,
-                            description = description,
-                            createdOn = date,
-                            isActive = selectedStatus != OperationStatus.CLOTURE,
-                            status = selectedStatus.name
+                    if (existing == null) {
+                        onSave(
+                            OperationModel(
+                                organismId = organismId,
+                                categoryId = selectedCategoryId,
+                                userId = userId,
+                                paymentMethodId = selectedPaymentId,
+                                currencyId = selectedCurrencyId,
+                                amount = amountValue,
+                                taskName = taskName,
+                                description = description,
+                                createdOn = date,
+                                isActive = selectedStatus != OperationStatus.CLOTURE,
+                                status = selectedStatus.name
+                            )
                         )
-                    )
+                    } else {
+                        onSave(
+                            existing.copy(
+                                categoryId = selectedCategoryId,
+                                paymentMethodId = selectedPaymentId,
+                                currencyId = selectedCurrencyId,
+                                amount = amountValue,
+                                taskName = taskName,
+                                description = description,
+                                createdOn = dateInput.ifBlank { existing.createdOn },
+                                isActive = selectedStatus != OperationStatus.CLOTURE,
+                                status = selectedStatus.name
+                            )
+                        )
+                    }
                 }
             )
         }
@@ -428,6 +533,7 @@ private fun OperationListItem(
     usdToCdfRate: Double,
     onClick: () -> Unit,
     onStatusClick: () -> Unit,
+    onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
     val currencyCode = operation.currency?.code ?: ExchangeRateRepository.CURRENCY_CDF_CODE
@@ -455,12 +561,22 @@ private fun OperationListItem(
                 Text(conversion, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
             }
         }
-        Text(
-            text = "${operation.currency?.symbol ?: ""} $amount",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(end = 4.dp)
-        )
+        Column(horizontalAlignment = Alignment.End) {
+            Text(
+                text = "${operation.currency?.symbol ?: ""} $amount",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(end = 4.dp)
+            )
+            IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
+                Icon(
+                    Icons.Default.Edit,
+                    contentDescription = stringResource(R.string.edit),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
     }
 }

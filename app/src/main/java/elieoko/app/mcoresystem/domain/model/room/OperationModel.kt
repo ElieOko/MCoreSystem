@@ -39,6 +39,10 @@ data class OperationModel(
     val isActive : Boolean = true,
     @ColumnInfo(name = "status", defaultValue = "OUVERT")
     val status : String = "OUVERT",
+    @ColumnInfo(name = "uuid", defaultValue = "")
+    val uuid : String = java.util.UUID.randomUUID().toString(),
+    @ColumnInfo(name = "updated_at", defaultValue = "")
+    val updatedAt : String = ""
 ){
     fun asDataSelect(item: List<OperationModel>?) : List<DataSelect>{
         val listDataSelect = mutableListOf<DataSelect>()

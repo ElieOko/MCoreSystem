@@ -100,11 +100,17 @@ fun HomePage(navC: NavHostController? = null, viewModelGlobal: ApplicationViewMo
             TopBarSimple(
                 onclick = { navC?.navigate(ScreenRoute.Setting.name) },
                 onclickLogOut = {
-                    navC?.navigate(ScreenRoute.Login.name) {
-                        popUpTo(ScreenRoute.Home.name) { inclusive = true }
+                    // Déconnexion volontaire : la session persistée est effacée.
+                    viewModelGlobal?.logout {
+                        navC?.navigate(ScreenRoute.Login.name) {
+                            popUpTo(ScreenRoute.Home.name) { inclusive = true }
+                        }
                     }
                 },
-                onclickSync = { viewModelGlobal?.room?.operation?.getAllOperation(userId) },
+                onclickSync = {
+                    viewModelGlobal?.room?.operation?.getAllOperation(userId)
+                    viewModelGlobal?.requestSync()
+                },
                 menuItem = menuItems,
                 username = username
             )
@@ -198,7 +204,7 @@ private fun QuickAccessCard(title: String, icon: ImageVector, accent: Color, onC
         onClick = onClick,
         shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(
             modifier = Modifier

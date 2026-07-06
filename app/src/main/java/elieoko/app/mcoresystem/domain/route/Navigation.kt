@@ -24,9 +24,10 @@ import elieoko.app.mcoresystem.presentation.ui.pages.setting.SettingPage
 @Composable
 fun Navigation(
     navC: NavHostController,
-    viewModelGlobal: ApplicationViewModel? = viewModel()
+    viewModelGlobal: ApplicationViewModel? = viewModel(),
+    startDestination: String = ScreenRoute.Login.name
 ) {
-    NavHost(navController = navC, startDestination = ScreenRoute.Login.name, route = "root") {
+    NavHost(navController = navC, startDestination = startDestination, route = "root") {
         composable(ScreenRoute.Login.name) {
             LoginPage(navC, viewModelGlobal)
         }

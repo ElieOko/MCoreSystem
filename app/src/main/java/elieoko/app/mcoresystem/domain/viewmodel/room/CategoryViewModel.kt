@@ -1,5 +1,6 @@
 package elieoko.app.mcoresystem.domain.viewmodel.room
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -13,36 +14,39 @@ import kotlinx.coroutines.withContext
 
 class CategoryViewModel(private val repository: CategorieRepository) : ViewModel() {
     private val _listCategory = MutableStateFlow<List<CategoryModel>>(arrayListOf())
+    private val _error = MutableStateFlow<String?>(null)
     val listCategories get() = _listCategory.asStateFlow()
+    val error get() = _error.asStateFlow()
 
-    fun getAll() = viewModelScope.launch {
+    fun getAll() = safeLaunch { refresh() }
+
+    fun insert(data: CategoryModel) = safeLaunch {
+        repository.insert(data)
         refresh()
     }
 
-    fun insert(data: CategoryModel) = viewModelScope.launch {
-        withContext(Dispatchers.IO) {
-            repository.insert(data)
-            refresh()
-        }
+    fun update(data: CategoryModel) = safeLaunch {
+        repository.update(data)
+        refresh()
     }
 
-    fun update(data: CategoryModel) = viewModelScope.launch {
-        withContext(Dispatchers.IO) {
-            repository.update(data)
-            refresh()
-        }
+    fun delete(data: CategoryModel) = safeLaunch {
+        repository.delete(data)
+        refresh()
     }
 
-    fun delete(data: CategoryModel) = viewModelScope.launch {
-        withContext(Dispatchers.IO) {
-            repository.delete(data)
-            refresh()
-        }
-    }
+    fun consumeError() { _error.value = null }
 
     private suspend fun refresh() {
-        withContext(Dispatchers.IO) {
-            _listCategory.value = repository.allData()
+        _listCategory.value = repository.allData()
+    }
+
+    private fun safeLaunch(block: suspend () -> Unit) = viewModelScope.launch {
+        try {
+            withContext(Dispatchers.IO) { block() }
+        } catch (e: Exception) {
+            Log.e("CategoryViewModel", "Opération échouée", e)
+            _error.value = e.message ?: "Une erreur est survenue"
         }
     }
 }

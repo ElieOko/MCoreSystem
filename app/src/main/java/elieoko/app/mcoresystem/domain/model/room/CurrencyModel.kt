@@ -20,7 +20,11 @@ data class CurrencyModel(
     @ColumnInfo(name = "code")
     val code : String = "",
     @ColumnInfo(name = "symbol")
-    val symbol : String = ""
+    val symbol : String = "",
+    @ColumnInfo(name = "uuid", defaultValue = "")
+    val uuid : String = java.util.UUID.randomUUID().toString(),
+    @ColumnInfo(name = "updated_at", defaultValue = "")
+    val updatedAt : String = ""
 ){
     fun asDataSelect(item: List<CurrencyModel>?) : List<DataSelect>{
         val listDataSelect = mutableListOf<DataSelect>()

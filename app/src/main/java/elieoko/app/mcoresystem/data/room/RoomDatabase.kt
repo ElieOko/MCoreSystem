@@ -11,7 +11,7 @@ import kotlinx.coroutines.*
 import java.util.concurrent.Executors
 
 @Database(
-    entities = [CurrencyModel::class, PaymentMethodModel::class, OperationModel::class, CategoryModel::class, TypeCategoryModel::class, OrganismModel::class, UserModel::class], version = 2, exportSchema = false)
+    entities = [CurrencyModel::class, PaymentMethodModel::class, OperationModel::class, CategoryModel::class, TypeCategoryModel::class, OrganismModel::class, UserModel::class, SyncQueueModel::class], version = 3, exportSchema = false)
 abstract class MCoreRoomDatabase : RoomDatabase() {
     abstract fun currencyDao(): ICurrencyDao
     abstract fun paymentMethodDao(): IPaymentMethodDao
@@ -20,6 +20,7 @@ abstract class MCoreRoomDatabase : RoomDatabase() {
     abstract fun organismDao(): IOrganismDao
     abstract fun categoryDao(): ICategoryDao
     abstract fun typeCategoryDao(): ITypeCategoryDao
+    abstract fun syncQueueDao(): ISyncQueueDao
     companion object{
         @Volatile
         private var INSTANCE: MCoreRoomDatabase? = null

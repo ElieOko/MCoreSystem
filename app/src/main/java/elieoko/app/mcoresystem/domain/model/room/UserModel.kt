@@ -17,4 +17,9 @@ data class UserModel(
     @ColumnInfo(name = "email") val email: String?,
     @ColumnInfo(name = "password") val password: String,
     @ColumnInfo(name = "organism_id") val organismId: Int,
+    @ColumnInfo(name = "role", defaultValue = "MEMBER") val role: String = "MEMBER",
+    @ColumnInfo(name = "uuid", defaultValue = "")
+    val uuid: String = java.util.UUID.randomUUID().toString(),
+    @ColumnInfo(name = "updated_at", defaultValue = "")
+    val updatedAt: String = ""
 )
