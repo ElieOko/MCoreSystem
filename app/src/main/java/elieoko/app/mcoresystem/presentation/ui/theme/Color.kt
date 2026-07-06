@@ -24,3 +24,18 @@ val BlueDarkSurfaceVariant = Color(0xFF1E3A5F)
 
 val bagdeColor = BluePrimary
 val wsColor = BluePrimaryLight.copy(alpha = 0.3f)
+
+// Accents fintech
+val AccentTeal = Color(0xFF00BFA5)
+val AccentViolet = Color(0xFF7C4DFF)
+val AccentCyan = Color(0xFF00B0FF)
+
+// Statuts d'opération
+val StatusOpen = Color(0xFF2962FF)
+val StatusPending = Color(0xFFFF9100)
+val StatusClosed = Color(0xFF00C853)
+
+// Sémantique
+val SuccessColor = Color(0xFF00C853)
+val WarningColor = Color(0xFFFFAB00)
+val ErrorColor = Color(0xFFD32F2F)

@@ -1,8 +1,13 @@
 package elieoko.app.mcoresystem.presentation.ui.pages.operation
 
+import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
@@ -11,16 +16,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import elieoko.app.mcoresystem.R
 import elieoko.app.mcoresystem.data.preferences.ExchangeRateRepository
+import elieoko.app.mcoresystem.domain.model.OperationStatus
+import elieoko.app.mcoresystem.domain.model.room.CurrencyModel
 import elieoko.app.mcoresystem.domain.model.room.OperationModel
 import elieoko.app.mcoresystem.domain.model.room.relation.OperationRelation
 import elieoko.app.mcoresystem.domain.route.ScreenRoute
 import elieoko.app.mcoresystem.domain.util.CurrencyConverter
 import elieoko.app.mcoresystem.domain.viewmodel.config.ApplicationViewModel
 import elieoko.app.mcoresystem.presentation.components.element.*
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -45,22 +54,13 @@ fun OperationPage(
     val usdToCdfRate by viewModelGlobal?.usdToCdfRate?.collectAsState()
         ?: remember { mutableDoubleStateOf(ExchangeRateRepository.DEFAULT_RATE) }
 
-    var showDialog by remember { mutableStateOf(false) }
-    var taskName by remember { mutableStateOf("") }
-    var description by remember { mutableStateOf("") }
-    var amount by remember { mutableStateOf("") }
-    var selectedCategoryId by remember { mutableIntStateOf(0) }
-    var selectedCurrencyId by remember { mutableIntStateOf(ExchangeRateRepository.CURRENCY_CDF_ID) }
-    var selectedPaymentId by remember { mutableIntStateOf(1) }
-    var categoryExpanded by remember { mutableStateOf(false) }
-    var currencyExpanded by remember { mutableStateOf(false) }
-    var paymentExpanded by remember { mutableStateOf(false) }
+    val snackbarHost = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
-    val selectedCurrency = currencies.find { it.id == selectedCurrencyId }
-    val amountValue = amount.toDoubleOrNull() ?: 0.0
-    val conversionPreview = if (amountValue > 0 && selectedCurrency != null) {
-        CurrencyConverter.conversionLabel(amountValue, selectedCurrency.code, usdToCdfRate)
-    } else ""
+    var showSheet by remember { mutableStateOf(false) }
+    var showCurrencySheet by remember { mutableStateOf(false) }
+    var statusFilter by remember { mutableStateOf<OperationStatus?>(null) }
+    var statusTarget by remember { mutableStateOf<OperationRelation?>(null) }
 
     LaunchedEffect(userId) {
         viewModelGlobal?.room?.operation?.getAllOperation(userId)
@@ -69,17 +69,14 @@ fun OperationPage(
         viewModelGlobal?.room?.paymentMethod?.getAllPaymentMethod()
     }
 
-    LaunchedEffect(categories) {
-        if (categories.isNotEmpty() && selectedCategoryId == 0) {
-            selectedCategoryId = categories.first().id
-        }
+    val filtered = remember(operations, statusFilter) {
+        if (statusFilter == null) operations
+        else operations.filter { OperationStatus.from(it.operation?.status) == statusFilter }
     }
 
-    LaunchedEffect(currencies) {
-        if (currencies.isNotEmpty() && currencies.none { it.id == selectedCurrencyId }) {
-            selectedCurrencyId = currencies.first().id
-        }
-    }
+    val addedMsg = stringResource(R.string.operation_added)
+    val deletedMsg = stringResource(R.string.item_deleted)
+    val statusMsg = stringResource(R.string.status_updated)
 
     Scaffold(
         topBar = {
@@ -90,95 +87,84 @@ fun OperationPage(
                 username = viewModelGlobal?.currentUsername?.value
             )
         },
+        snackbarHost = { SnackbarHost(snackbarHost) },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = { showDialog = true },
-                containerColor = MaterialTheme.colorScheme.primary
-            ) {
-                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add))
-            }
+            ExtendedFloatingActionButton(
+                onClick = { showSheet = true },
+                containerColor = MaterialTheme.colorScheme.primary,
+                icon = { Icon(Icons.Default.Add, contentDescription = null) },
+                text = { Text(stringResource(R.string.add)) }
+            )
         },
         containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
-        if (operations.isEmpty()) {
-            Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                Text(stringResource(R.string.no_data), color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = PaddingValues(vertical = 16.dp)
-            ) {
-                items(operations, key = { it.operation?.id ?: 0 }) { operation ->
-                    OperationListItem(
-                        operation = operation,
-                        usdToCdfRate = usdToCdfRate,
-                        onClick = {
-                            navC?.navigate("${ScreenRoute.OperationDetail.name}/${operation.operation?.id}")
-                        },
-                        onDelete = {
-                            operation.operation?.let { viewModelGlobal?.room?.operation?.delete(it) }
-                        }
-                    )
+        Column(Modifier.padding(padding).fillMaxSize()) {
+            StatusFilterRow(statusFilter) { statusFilter = it }
+            if (filtered.isEmpty()) {
+                EmptyState(message = stringResource(R.string.no_data))
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(top = 12.dp, bottom = 90.dp)
+                ) {
+                    items(filtered, key = { it.operation?.id ?: 0 }) { operation ->
+                        OperationListItem(
+                            operation = operation,
+                            usdToCdfRate = usdToCdfRate,
+                            onClick = { navC?.navigate("${ScreenRoute.OperationDetail.name}/${operation.operation?.id}") },
+                            onStatusClick = { statusTarget = operation },
+                            onDelete = {
+                                operation.operation?.let { viewModelGlobal?.room?.operation?.delete(it) }
+                                scope.launch { snackbarHost.showSnackbar(deletedMsg) }
+                            }
+                        )
+                    }
                 }
             }
         }
     }
 
-    if (showDialog) {
-        AlertDialog(
-            onDismissRequest = { showDialog = false },
-            title = { Text("${stringResource(R.string.add)} ${stringResource(R.string.operations)}") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    MCoreTextField(value = taskName, onValueChange = { taskName = it }, label = stringResource(R.string.task_name))
-                    MCoreTextField(value = description, onValueChange = { description = it }, label = stringResource(R.string.description))
-                    MCoreTextField(
-                        value = amount,
-                        onValueChange = { amount = it },
-                        label = stringResource(R.string.amount),
-                        keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal
-                    )
-                    if (conversionPreview.isNotBlank()) {
-                        Text(
-                            text = "${stringResource(R.string.conversion_preview)} : $conversionPreview",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                    CurrencyDropdown(categories, selectedCategoryId, categoryExpanded, { categoryExpanded = it }, { selectedCategoryId = it }, stringResource(R.string.category), { it.name })
-                    CurrencyDropdown(currencies, selectedCurrencyId, currencyExpanded, { currencyExpanded = it }, { selectedCurrencyId = it }, stringResource(R.string.currency), { "${it.symbol} (${it.code})" })
-                    CurrencyDropdown(paymentMethods, selectedPaymentId, paymentExpanded, { paymentExpanded = it }, { selectedPaymentId = it }, stringResource(R.string.payment_method), { it.name })
+    if (showSheet) {
+        AddOperationSheet(
+            categories = categories,
+            currencies = currencies,
+            paymentMethods = paymentMethods,
+            usdToCdfRate = usdToCdfRate,
+            onDismiss = { showSheet = false },
+            onCreateCurrency = { showSheet = false; showCurrencySheet = true },
+            onSave = { model ->
+                viewModelGlobal?.room?.operation?.insert(model)
+                showSheet = false
+                scope.launch { snackbarHost.showSnackbar(addedMsg) }
+            },
+            organismId = organismId,
+            userId = userId
+        )
+    }
+
+    if (showCurrencySheet) {
+        AddCurrencySheet(
+            onDismiss = { showCurrencySheet = false },
+            onSave = { model ->
+                viewModelGlobal?.room?.currency?.insert(model)
+                showCurrencySheet = false
+                showSheet = true
+            }
+        )
+    }
+
+    statusTarget?.let { target ->
+        StatusPickerSheet(
+            current = OperationStatus.from(target.operation?.status),
+            onDismiss = { statusTarget = null },
+            onSelect = { status ->
+                target.operation?.let { viewModelGlobal?.room?.operation?.updateStatus(it.id, status.name) }
+                statusTarget = null
+                scope.launch {
+                    viewModelGlobal?.room?.operation?.getAllOperation(userId)
+                    snackbarHost.showSnackbar(statusMsg)
                 }
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    if (taskName.isNotBlank() && amount.isNotBlank()) {
-                        val date = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
-                        viewModelGlobal?.room?.operation?.insert(
-                            OperationModel(
-                                organismId = organismId,
-                                categoryId = selectedCategoryId,
-                                userId = userId,
-                                paymentMethodId = selectedPaymentId,
-                                currencyId = selectedCurrencyId,
-                                amount = amount.toDoubleOrNull() ?: 0.0,
-                                taskName = taskName,
-                                description = description,
-                                createdOn = date
-                            )
-                        )
-                        taskName = ""
-                        description = ""
-                        amount = ""
-                        showDialog = false
-                    }
-                }) { Text(stringResource(R.string.save), color = MaterialTheme.colorScheme.primary) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDialog = false }) { Text(stringResource(R.string.cancel)) }
             }
         )
     }
@@ -186,38 +172,251 @@ fun OperationPage(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun <T> CurrencyDropdown(
-    items: List<T>,
-    selectedId: Int,
-    expanded: Boolean,
-    onExpandedChange: (Boolean) -> Unit,
-    onSelect: (Int) -> Unit,
-    label: String,
-    displayText: (T) -> String
-) {
-    val getId: (T) -> Int = { item ->
-        when (item) {
-            is elieoko.app.mcoresystem.domain.model.room.CategoryModel -> item.id
-            is elieoko.app.mcoresystem.domain.model.room.CurrencyModel -> item.id
-            is elieoko.app.mcoresystem.domain.model.room.PaymentMethodModel -> item.id
-            else -> 0
+private fun StatusFilterRow(selected: OperationStatus?, onSelect: (OperationStatus?) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        FilterChip(
+            selected = selected == null,
+            onClick = { onSelect(null) },
+            label = { Text(stringResource(R.string.all)) }
+        )
+        OperationStatus.entries.forEach { status ->
+            FilterChip(
+                selected = selected == status,
+                onClick = { onSelect(status) },
+                label = { Text(status.label) }
+            )
         }
     }
-    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = onExpandedChange) {
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AddOperationSheet(
+    categories: List<elieoko.app.mcoresystem.domain.model.room.CategoryModel>,
+    currencies: List<CurrencyModel>,
+    paymentMethods: List<elieoko.app.mcoresystem.domain.model.room.PaymentMethodModel>,
+    usdToCdfRate: Double,
+    organismId: Int,
+    userId: Int,
+    onDismiss: () -> Unit,
+    onCreateCurrency: () -> Unit,
+    onSave: (OperationModel) -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var taskName by remember { mutableStateOf("") }
+    var description by remember { mutableStateOf("") }
+    var amount by remember { mutableStateOf("") }
+    var selectedCategoryId by remember { mutableIntStateOf(categories.firstOrNull()?.id ?: 0) }
+    var selectedCurrencyId by remember { mutableIntStateOf(currencies.firstOrNull()?.id ?: 0) }
+    var selectedPaymentId by remember { mutableIntStateOf(paymentMethods.firstOrNull()?.id ?: 0) }
+    var selectedStatus by remember { mutableStateOf(OperationStatus.OUVERT) }
+    var showError by remember { mutableStateOf(false) }
+
+    LaunchedEffect(categories) { if (selectedCategoryId == 0) selectedCategoryId = categories.firstOrNull()?.id ?: 0 }
+    LaunchedEffect(currencies) { if (selectedCurrencyId == 0) selectedCurrencyId = currencies.firstOrNull()?.id ?: 0 }
+    LaunchedEffect(paymentMethods) { if (selectedPaymentId == 0) selectedPaymentId = paymentMethods.firstOrNull()?.id ?: 0 }
+
+    val amountValue = amount.toDoubleOrNull() ?: 0.0
+    val selectedCurrency = currencies.find { it.id == selectedCurrencyId }
+    val conversion = if (amountValue > 0 && selectedCurrency != null)
+        CurrencyConverter.conversionLabel(amountValue, selectedCurrency.code, usdToCdfRate) else ""
+
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 32.dp)
+        ) {
+            Text(
+                text = "${stringResource(R.string.add)} ${stringResource(R.string.operations)}",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+            Space(y = 16)
+            if (currencies.isEmpty()) {
+                AnimatedFeedback(visible = true, message = stringResource(R.string.no_currency_hint), isError = true)
+                Space(y = 8)
+                MCoreOutlinedButton(text = stringResource(R.string.add_currency), onClick = onCreateCurrency)
+                Space(y = 8)
+            }
+            MCoreTextField(
+                value = taskName,
+                onValueChange = { taskName = it },
+                label = stringResource(R.string.task_name),
+                isError = showError && taskName.isBlank()
+            )
+            Space(y = 8)
+            MCoreTextField(value = description, onValueChange = { description = it }, label = stringResource(R.string.description))
+            Space(y = 8)
+            MCoreTextField(
+                value = amount,
+                onValueChange = { amount = it },
+                label = stringResource(R.string.amount),
+                keyboardType = KeyboardType.Decimal,
+                isError = showError && amountValue <= 0.0
+            )
+            if (conversion.isNotBlank()) {
+                Space(y = 6)
+                Text(
+                    text = "${stringResource(R.string.conversion_preview)} : $conversion",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.animateContentSize()
+                )
+            }
+            Space(y = 12)
+            LabeledDropdown(
+                label = stringResource(R.string.category),
+                options = categories.map { it.id to it.name },
+                selectedId = selectedCategoryId,
+                onSelect = { selectedCategoryId = it }
+            )
+            Space(y = 8)
+            LabeledDropdown(
+                label = stringResource(R.string.currency),
+                options = currencies.map { it.id to "${it.symbol} (${it.code})" },
+                selectedId = selectedCurrencyId,
+                onSelect = { selectedCurrencyId = it }
+            )
+            Space(y = 8)
+            LabeledDropdown(
+                label = stringResource(R.string.payment_method),
+                options = paymentMethods.map { it.id to it.name },
+                selectedId = selectedPaymentId,
+                onSelect = { selectedPaymentId = it }
+            )
+            Space(y = 12)
+            Text(stringResource(R.string.status), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Space(y = 6)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OperationStatus.entries.forEach { status ->
+                    FilterChip(
+                        selected = selectedStatus == status,
+                        onClick = { selectedStatus = status },
+                        label = { Text(status.label) }
+                    )
+                }
+            }
+            Space(y = 12)
+            AnimatedFeedback(visible = showError, message = stringResource(R.string.validation_error), isError = true)
+            Space(y = 12)
+            MCoreButton(
+                text = stringResource(R.string.save),
+                enabled = currencies.isNotEmpty(),
+                onClick = {
+                    if (taskName.isBlank() || amountValue <= 0.0 || selectedCategoryId == 0 || selectedCurrencyId == 0) {
+                        showError = true
+                        return@MCoreButton
+                    }
+                    val date = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
+                    onSave(
+                        OperationModel(
+                            organismId = organismId,
+                            categoryId = selectedCategoryId,
+                            userId = userId,
+                            paymentMethodId = selectedPaymentId,
+                            currencyId = selectedCurrencyId,
+                            amount = amountValue,
+                            taskName = taskName,
+                            description = description,
+                            createdOn = date,
+                            isActive = selectedStatus != OperationStatus.CLOTURE,
+                            status = selectedStatus.name
+                        )
+                    )
+                }
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AddCurrencySheet(onDismiss: () -> Unit, onSave: (CurrencyModel) -> Unit) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var name by remember { mutableStateOf("") }
+    var code by remember { mutableStateOf("") }
+    var symbol by remember { mutableStateOf("") }
+    var showError by remember { mutableStateOf(false) }
+
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        Column(Modifier.fillMaxWidth().padding(20.dp).padding(bottom = 24.dp)) {
+            Text(stringResource(R.string.add_currency), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Space(y = 16)
+            MCoreTextField(value = name, onValueChange = { name = it }, label = stringResource(R.string.currency_name), isError = showError && name.isBlank())
+            Space(y = 8)
+            MCoreTextField(value = code, onValueChange = { code = it }, label = stringResource(R.string.currency_code), isError = showError && code.isBlank())
+            Space(y = 8)
+            MCoreTextField(value = symbol, onValueChange = { symbol = it }, label = stringResource(R.string.currency_symbol), isError = showError && symbol.isBlank())
+            Space(y = 12)
+            AnimatedFeedback(visible = showError, message = stringResource(R.string.validation_error), isError = true)
+            Space(y = 12)
+            MCoreButton(text = stringResource(R.string.save), onClick = {
+                if (name.isBlank() || code.isBlank() || symbol.isBlank()) { showError = true; return@MCoreButton }
+                onSave(CurrencyModel(name = name, code = code.uppercase(), symbol = symbol))
+            })
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun StatusPickerSheet(
+    current: OperationStatus,
+    onDismiss: () -> Unit,
+    onSelect: (OperationStatus) -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        Column(Modifier.fillMaxWidth().padding(20.dp).padding(bottom = 32.dp)) {
+            Text(stringResource(R.string.change_status), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Space(y = 16)
+            OperationStatus.entries.forEach { status ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 6.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    StatusBadge(status)
+                    RadioButton(selected = current == status, onClick = { onSelect(status) })
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LabeledDropdown(
+    label: String,
+    options: List<Pair<Int, String>>,
+    selectedId: Int,
+    onSelect: (Int) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
         OutlinedTextField(
-            value = items.find { getId(it) == selectedId }?.let(displayText) ?: "",
+            value = options.find { it.first == selectedId }?.second ?: "",
             onValueChange = {},
             readOnly = true,
             label = { Text(label) },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             modifier = Modifier.menuAnchor().fillMaxWidth()
         )
-        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { onExpandedChange(false) }) {
-            items.forEach { item ->
-                DropdownMenuItem(
-                    text = { Text(displayText(item)) },
-                    onClick = { onSelect(getId(item)); onExpandedChange(false) }
-                )
+        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            options.forEach { (id, text) ->
+                DropdownMenuItem(text = { Text(text) }, onClick = { onSelect(id); expanded = false })
             }
         }
     }
@@ -228,18 +427,31 @@ private fun OperationListItem(
     operation: OperationRelation,
     usdToCdfRate: Double,
     onClick: () -> Unit,
+    onStatusClick: () -> Unit,
     onDelete: () -> Unit
 ) {
     val currencyCode = operation.currency?.code ?: ExchangeRateRepository.CURRENCY_CDF_CODE
     val amount = operation.operation?.amount ?: 0.0
     val conversion = CurrencyConverter.conversionLabel(amount, currencyCode, usdToCdfRate)
+    val status = OperationStatus.from(operation.operation?.status)
 
     DeleteableListItem(onClick = onClick, onDelete = onDelete) {
         Column(Modifier.weight(1f).padding(vertical = 8.dp)) {
-            Text(operation.operation?.taskName ?: "", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    operation.operation?.taskName ?: "",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+            }
             Text(operation.category?.name ?: "", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(operation.operation?.createdOn ?: "", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Space(y = 4)
+            Box(Modifier.clickable { onStatusClick() }) {
+                StatusBadge(status)
+            }
             if (conversion.isNotBlank()) {
+                Space(y = 2)
                 Text(conversion, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
             }
         }
