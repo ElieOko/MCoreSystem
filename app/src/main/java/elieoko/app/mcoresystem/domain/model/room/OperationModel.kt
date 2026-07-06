@@ -37,6 +37,8 @@ data class OperationModel(
     val createdOn : String,
     @ColumnInfo(name = "is_active")
     val isActive : Boolean = true,
+    @ColumnInfo(name = "status", defaultValue = "OUVERT")
+    val status : String = "OUVERT",
 ){
     fun asDataSelect(item: List<OperationModel>?) : List<DataSelect>{
         val listDataSelect = mutableListOf<DataSelect>()

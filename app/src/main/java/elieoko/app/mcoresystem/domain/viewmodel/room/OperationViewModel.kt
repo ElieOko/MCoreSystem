@@ -72,6 +72,12 @@ class OperationViewModel(private val repository: OperationRepository) : ViewMode
             repository.delete(operation)
         }
     }
+
+    fun updateStatus(operationId: Int, status: String) = viewModelScope.launch {
+        withContext(Dispatchers.IO) {
+            repository.updateStatus(operationId, status)
+        }
+    }
 }
 
 class OperationViewModelFactory(private val repository: OperationRepository) : ViewModelProvider.Factory {

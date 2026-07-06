@@ -8,8 +8,15 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface IOperationDao {
     @Transaction
-    @Query("SELECT * FROM TOperation WHERE user_id LIKE :userId")
+    @Query("SELECT * FROM TOperation WHERE user_id LIKE :userId ORDER BY operation_id DESC")
     fun getAll(userId : Int): Flow<List<OperationRelation>>
+
+    @Transaction
+    @Query("SELECT * FROM TOperation WHERE status != 'CLOTURE' ORDER BY operation_id DESC")
+    fun getPendingOperations(): List<OperationRelation>
+
+    @Query("UPDATE TOperation SET status = :status WHERE operation_id = :operationId")
+    suspend fun updateStatus(operationId: Int, status: String)
 
     @Transaction
     @Query("SELECT * FROM TOperation WHERE operation_id LIKE :operationId")

@@ -11,7 +11,7 @@ import kotlinx.coroutines.*
 import java.util.concurrent.Executors
 
 @Database(
-    entities = [CurrencyModel::class, PaymentMethodModel::class, OperationModel::class, CategoryModel::class, TypeCategoryModel::class, OrganismModel::class, UserModel::class], version = 1, exportSchema = false)
+    entities = [CurrencyModel::class, PaymentMethodModel::class, OperationModel::class, CategoryModel::class, TypeCategoryModel::class, OrganismModel::class, UserModel::class], version = 2, exportSchema = false)
 abstract class MCoreRoomDatabase : RoomDatabase() {
     abstract fun currencyDao(): ICurrencyDao
     abstract fun paymentMethodDao(): IPaymentMethodDao
@@ -33,6 +33,7 @@ abstract class MCoreRoomDatabase : RoomDatabase() {
                     .setQueryCallback({ sqlQuery, bindArgs ->
                         Log.d("ROOM_SQL", "SQL Query: $sqlQuery SQL Args: $bindArgs")
                     }, Executors.newSingleThreadExecutor())
+                    .fallbackToDestructiveMigration(true)
                     .addCallback(MCoreDatabaseCallback(scope))
                     .addCallback(object : Callback() {
                         override fun onOpen(db: SupportSQLiteDatabase) {
@@ -90,6 +91,20 @@ abstract class MCoreRoomDatabase : RoomDatabase() {
                 val organismDao = database.organismDao()
                 if (organismDao.getAll().isEmpty()) {
                     organismDao.insertAll(OrganismModel(id = 1, name = "MCoreSystem"))
+                }
+                val typeCategoryDao = database.typeCategoryDao()
+                if (typeCategoryDao.getAll().isEmpty()) {
+                    typeCategoryDao.insertAll(
+                        TypeCategoryModel(id = 1, organismId = 1, name = "Recette", description = "Entrées d'argent"),
+                        TypeCategoryModel(id = 2, organismId = 1, name = "Dépense", description = "Sorties d'argent")
+                    )
+                }
+                val categoryDao = database.categoryDao()
+                if (categoryDao.getAll().isEmpty()) {
+                    categoryDao.insertAll(
+                        CategoryModel(id = 1, organismId = 1, typeCategoryId = 1, name = "Vente", description = "Ventes diverses"),
+                        CategoryModel(id = 2, organismId = 1, typeCategoryId = 2, name = "Achat", description = "Achats divers")
+                    )
                 }
             }
         }
