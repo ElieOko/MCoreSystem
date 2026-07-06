@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -6,6 +8,15 @@ plugins {
     id("com.google.gms.google-services")
     id("com.google.devtools.ksp")
 }
+
+// Secrets hors du code source : local.properties ou variables d'environnement.
+val localProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+}
+
+fun secret(name: String): String =
+    localProperties.getProperty(name) ?: System.getenv(name) ?: ""
 
 android {
     namespace = "elieoko.app.mcoresystem"
@@ -31,6 +42,9 @@ android {
                 )
             }
         }
+
+        buildConfigField("String", "SUPABASE_URL", "\"${secret("SUPABASE_URL")}\"")
+        buildConfigField("String", "SUPABASE_ANON_KEY", "\"${secret("SUPABASE_ANON_KEY")}\"")
     }
 
     buildTypes {
@@ -55,6 +69,7 @@ android {
 //    }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 ksp {
@@ -109,6 +124,11 @@ dependencies {
     implementation(libs.accompanist.permissions)
     // WorkManager (notifications planifiées)
     implementation(libs.androidx.work.runtime.ktx)
+    // Supabase (backend cloud, offline-first)
+    implementation(platform(libs.supabase.bom))
+    implementation(libs.supabase.postgrest)
+    implementation(libs.supabase.auth)
+    implementation(libs.supabase.realtime)
     //firebase
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.analytics)

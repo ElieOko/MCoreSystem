@@ -16,7 +16,11 @@ import elieoko.app.mcoresystem.domain.model.DataSelect
 data class PaymentMethodModel(
     @PrimaryKey(autoGenerate = true)
     @ColumnInfo(name = "payment_method_id") val id : Int = 0,
-    @ColumnInfo(name = "name") val name : String = ""
+    @ColumnInfo(name = "name") val name : String = "",
+    @ColumnInfo(name = "uuid", defaultValue = "")
+    val uuid : String = java.util.UUID.randomUUID().toString(),
+    @ColumnInfo(name = "updated_at", defaultValue = "")
+    val updatedAt : String = ""
 ){
     fun asDataSelect(item: List<PaymentMethodModel>?) : List<DataSelect>{
         val listDataSelect = mutableListOf<DataSelect>()

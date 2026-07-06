@@ -40,6 +40,8 @@ material = "1.10.0"
 material3 = "1.4.0-alpha18"
 # workmanager
 workManager = "2.9.1"
+# supabase
+supabaseBom = "3.6.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -93,6 +95,11 @@ firebase-analytics = { module = "com.google.firebase:firebase-analytics" }
 firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebaseBom" }
 # workmanager
 androidx-work-runtime-ktx = { module = "androidx.work:work-runtime-ktx", version.ref = "workManager" }
+# supabase
+supabase-bom = { module = "io.github.jan-tennert.supabase:bom", version.ref = "supabaseBom" }
+supabase-postgrest = { module = "io.github.jan-tennert.supabase:postgrest-kt" }
+supabase-auth = { module = "io.github.jan-tennert.supabase:auth-kt" }
+supabase-realtime = { module = "io.github.jan-tennert.supabase:realtime-kt" }
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }

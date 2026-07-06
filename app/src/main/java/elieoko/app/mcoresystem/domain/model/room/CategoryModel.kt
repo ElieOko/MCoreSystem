@@ -24,7 +24,11 @@ data class CategoryModel(
     @ColumnInfo(name = "name")
     val name : String = "",
     @ColumnInfo(name = "description")
-    val description : String = ""
+    val description : String = "",
+    @ColumnInfo(name = "uuid", defaultValue = "")
+    val uuid : String = java.util.UUID.randomUUID().toString(),
+    @ColumnInfo(name = "updated_at", defaultValue = "")
+    val updatedAt : String = ""
 ){
     fun asDataSelect(item: List<CategoryModel>?) : List<DataSelect>{
         val listDataSelect = mutableListOf<DataSelect>()

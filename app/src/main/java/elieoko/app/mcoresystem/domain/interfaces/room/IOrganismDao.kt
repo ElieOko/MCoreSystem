@@ -10,6 +10,12 @@ interface IOrganismDao {
     @Query("SELECT * FROM TOrganism")
     fun getAll(): List<OrganismModel>
 
+    @Query("SELECT * FROM TOrganism WHERE uuid = :uuid LIMIT 1")
+    fun findByUuid(uuid: String): OrganismModel?
+
+    @Query("SELECT * FROM TOrganism WHERE organism_id = :id LIMIT 1")
+    fun findById(id: Int): OrganismModel?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(vararg organismModel: OrganismModel)
 

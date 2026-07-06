@@ -8,6 +8,12 @@ interface IPaymentMethodDao {
     @Query("SELECT * FROM TPaymentMethod")
     fun getAll(): List<PaymentMethodModel>
 
+    @Query("SELECT * FROM TPaymentMethod WHERE uuid = :uuid LIMIT 1")
+    fun findByUuid(uuid: String): PaymentMethodModel?
+
+    @Query("SELECT * FROM TPaymentMethod WHERE payment_method_id = :id LIMIT 1")
+    fun findById(id: Int): PaymentMethodModel?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(vararg paymentMethods: PaymentMethodModel)
 

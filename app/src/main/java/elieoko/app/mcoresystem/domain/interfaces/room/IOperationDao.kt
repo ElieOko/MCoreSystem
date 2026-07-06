@@ -15,8 +15,17 @@ interface IOperationDao {
     @Query("SELECT * FROM TOperation WHERE status != 'CLOTURE' ORDER BY operation_id DESC")
     fun getPendingOperations(): List<OperationRelation>
 
-    @Query("UPDATE TOperation SET status = :status WHERE operation_id = :operationId")
-    suspend fun updateStatus(operationId: Int, status: String)
+    @Query("UPDATE TOperation SET status = :status, updated_at = :updatedAt WHERE operation_id = :operationId")
+    suspend fun updateStatus(operationId: Int, status: String, updatedAt: String)
+
+    @Query("SELECT * FROM TOperation WHERE uuid = :uuid LIMIT 1")
+    fun findByUuid(uuid: String): OperationModel?
+
+    @Query("SELECT * FROM TOperation WHERE operation_id = :id LIMIT 1")
+    fun findById(id: Int): OperationModel?
+
+    @Query("SELECT * FROM TOperation")
+    fun getAllPlain(): List<OperationModel>
 
     @Transaction
     @Query("SELECT * FROM TOperation WHERE operation_id LIKE :operationId")

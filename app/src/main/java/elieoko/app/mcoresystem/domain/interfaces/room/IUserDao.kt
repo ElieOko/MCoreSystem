@@ -20,6 +20,12 @@ interface IUserDao {
     @Query("SELECT * FROM TUser WHERE username = :username AND password = :password LIMIT 1")
     fun login(username: String, password: String): UserModel?
 
+    @Query("SELECT * FROM TUser WHERE email = :email LIMIT 1")
+    fun findByEmail(email: String): UserModel?
+
+    @Query("SELECT * FROM TUser WHERE uuid = :uuid LIMIT 1")
+    fun findByUuid(uuid: String): UserModel?
+
     @Query("SELECT COUNT(*) FROM TUser")
     fun countUsers(): Int
 

@@ -9,6 +9,12 @@ interface ICategoryDao {
     @Query("SELECT * FROM TCategory")
     fun getAll(): List<CategoryModel>
 
+    @Query("SELECT * FROM TCategory WHERE uuid = :uuid LIMIT 1")
+    fun findByUuid(uuid: String): CategoryModel?
+
+    @Query("SELECT * FROM TCategory WHERE category_id = :id LIMIT 1")
+    fun findById(id: Int): CategoryModel?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(vararg categoryModel: CategoryModel)
 
