@@ -41,7 +41,9 @@ class CurrencyViewModel(private val repository: CurrencyRepository) : ViewModel(
     }
 
     private suspend fun refresh() {
-        _listCurrencies.value = repository.allCurrency()
+        withContext(Dispatchers.IO) {
+            _listCurrencies.value = repository.allCurrency()
+        }
     }
 }
 

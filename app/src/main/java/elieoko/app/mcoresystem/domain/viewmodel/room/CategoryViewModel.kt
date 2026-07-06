@@ -41,7 +41,9 @@ class CategoryViewModel(private val repository: CategorieRepository) : ViewModel
     }
 
     private suspend fun refresh() {
-        _listCategory.value = repository.allData()
+        withContext(Dispatchers.IO) {
+            _listCategory.value = repository.allData()
+        }
     }
 }
 
