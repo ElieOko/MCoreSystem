@@ -12,6 +12,12 @@ class UserRepository(val dao : IUserDao) {
     fun getCurrentUser(userId : Int): List<UserModel> = dao.loadAllById(userId)
 
     @WorkerThread
+    fun login(username: String, password: String): UserModel? = dao.login(username, password)
+
+    @WorkerThread
+    fun countUsers(): Int = dao.countUsers()
+
+    @WorkerThread
     fun insert(user: UserModel) {
         dao.insertAll(user)
     }

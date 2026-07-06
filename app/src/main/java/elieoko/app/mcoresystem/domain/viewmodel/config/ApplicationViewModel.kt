@@ -1,5 +1,7 @@
 package elieoko.app.mcoresystem.domain.viewmodel.config
 
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.*
 import elieoko.app.mcoresystem.domain.viewmodel.room.*
 
@@ -26,4 +28,7 @@ class ApplicationViewModel(
     roomVm : InstanceRoomViewModel
 ): ViewModel(){
     val room = roomVm
+    var currentUserId = mutableIntStateOf(1)
+    var currentUsername = mutableStateOf("Utilisateur")
+    var currentOrganismId = mutableIntStateOf(1)
 }
