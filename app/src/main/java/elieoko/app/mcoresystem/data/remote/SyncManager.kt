@@ -10,6 +10,7 @@ import elieoko.app.mcoresystem.domain.model.room.PaymentMethodModel
 import elieoko.app.mcoresystem.domain.model.room.SyncQueueModel
 import elieoko.app.mcoresystem.domain.model.room.TypeCategoryModel
 import elieoko.app.mcoresystem.domain.util.TimeUtil
+import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.query.Columns
 import kotlinx.coroutines.Dispatchers
@@ -19,7 +20,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
-enum class SyncStatus { IDLE, SYNCING, SUCCESS, ERROR, OFFLINE_ONLY }
+enum class SyncStatus { IDLE, SYNCING, SUCCESS, ERROR, OFFLINE_ONLY, AUTH_REQUIRED }
 
 /**
  * Moteur de synchronisation Offline First.
@@ -40,17 +41,25 @@ class SyncManager(private val database: MCoreRoomDatabase) {
 
     private val mutex = Mutex()
 
-    suspend fun syncAll(organismUuid: String) {
+    suspend fun syncAll(organismUuid: String, username: String = "", role: String = "MEMBER") {
         val client = SupabaseProvider.client
         if (client == null) {
             _status.value = SyncStatus.OFFLINE_ONLY
             return
         }
         if (organismUuid.isBlank()) return
+        // Sans session Supabase, RLS rejette toute écriture : on garde la file
+        // en attente au lieu de générer des erreurs, et on informe l'UI.
+        if (client.auth.currentSessionOrNull() == null) {
+            _status.value = SyncStatus.AUTH_REQUIRED
+            _lastError.value = "Session Supabase requise : connectez-vous avec votre email"
+            return
+        }
         mutex.withLock {
             _status.value = SyncStatus.SYNCING
             try {
                 withContext(Dispatchers.IO) {
+                    ensureRemoteIdentity(organismUuid, username, role)
                     push()
                     pull(organismUuid)
                 }
@@ -62,6 +71,47 @@ class SyncManager(private val database: MCoreRoomDatabase) {
                 _status.value = SyncStatus.ERROR
             }
         }
+    }
+
+    /**
+     * Auto-réparation : garantit que l'organisation et le profil de l'utilisateur
+     * connecté existent côté Supabase avant de pousser les données.
+     * Sans cela, `current_organism_uuid()` est nul et toutes les politiques RLS échouent.
+     */
+    private suspend fun ensureRemoteIdentity(organismUuid: String, username: String, role: String) {
+        val client = SupabaseProvider.client ?: return
+        val authUid = client.auth.currentUserOrNull()?.id ?: return
+        val organism = database.organismDao().findByUuid(organismUuid) ?: return
+
+        val localUser = database.userDao().findByUuid(authUid)
+
+        // 1. L'organisation d'abord (clé étrangère du profil ; insert ouvert
+        //    à tout utilisateur authentifié).
+        runCatching {
+            client.from(TABLE_ORGANISMS).upsert(
+                RemoteOrganism(
+                    uuid = organism.uuid,
+                    name = organism.name,
+                    updatedAt = organism.updatedAt.ifBlank { TimeUtil.nowIso() }
+                )
+            ) { onConflict = "uuid" }
+        }.onFailure { Log.w(TAG, "Upsert organisation : ${it.message}") }
+
+        // 2. Puis le profil : RLS impose uuid = auth.uid(), et il est indispensable
+        //    pour que current_organism_uuid() fonctionne sur toutes les autres tables.
+        runCatching {
+            client.from(TABLE_PROFILES).upsert(
+                RemoteProfile(
+                    uuid = authUid,
+                    organismUuid = organism.uuid,
+                    username = username.ifBlank { localUser?.username ?: "Utilisateur" },
+                    email = localUser?.email,
+                    phone = localUser?.phone,
+                    role = role,
+                    updatedAt = TimeUtil.nowIso()
+                )
+            ) { onConflict = "uuid" }
+        }.onFailure { Log.w(TAG, "Upsert profil : ${it.message}") }
     }
 
     /** Room → Supabase : rejoue la file d'attente des changements locaux. */

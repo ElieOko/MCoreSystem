@@ -48,7 +48,7 @@ class MCoreApplication : Application() {
             try {
                 val session = sessionRepository.session.first()
                 if (session.isLoggedIn && session.organismUuid.isNotBlank()) {
-                    syncManager.syncAll(session.organismUuid)
+                    syncManager.syncAll(session.organismUuid, session.username, session.role)
                 }
             } catch (_: Exception) {
                 // La synchronisation réessaiera au prochain déclencheur.

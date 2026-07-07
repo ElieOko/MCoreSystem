@@ -38,33 +38,40 @@ class AuthRepository(
 
     suspend fun login(identifier: String, password: String): AuthResult = withContext(Dispatchers.IO) {
         try {
+            // 1. Résolution du compte local (par nom d'utilisateur ou par email).
+            var user = database.userDao().login(identifier, password)
+                ?: database.userDao().findByEmail(identifier)?.takeIf { it.password == password }
+
             val client = SupabaseProvider.client
-            if (client != null && identifier.contains("@")) {
+            // Email à utiliser pour la session cloud : l'identifiant s'il en est un,
+            // sinon l'email enregistré sur le compte local.
+            val email = if (identifier.contains("@")) identifier else user?.email
+
+            // 2. Session Supabase (indispensable pour passer les politiques RLS).
+            if (client != null && !email.isNullOrBlank()) {
                 try {
                     client.auth.signInWith(Email) {
-                        this.email = identifier
+                        this.email = email
                         this.password = password
+                    }
+                    // Aligne l'utilisateur local sur l'identifiant Supabase Auth.
+                    val authUid = client.auth.currentUserOrNull()?.id
+                    if (user == null) user = database.userDao().findByEmail(email)
+                    if (authUid != null && user != null && user.uuid != authUid) {
+                        user = user.copy(uuid = authUid)
+                        database.userDao().updateAll(user)
                     }
                 } catch (e: Exception) {
                     Log.w(TAG, "Connexion Supabase impossible, repli local : ${e.message}")
-                    return@withContext localLogin(identifier, password)
                 }
-                val local = database.userDao().findByEmail(identifier)
-                    ?: return@withContext localLogin(identifier, password)
-                return@withContext persistAndReturn(local)
             }
-            localLogin(identifier, password)
+
+            if (user != null) persistAndReturn(user)
+            else AuthResult.Error("Identifiants incorrects")
         } catch (e: Exception) {
             Log.e(TAG, "Erreur de connexion", e)
             AuthResult.Error(e.message ?: "Erreur de connexion")
         }
-    }
-
-    private suspend fun localLogin(identifier: String, password: String): AuthResult {
-        val user = database.userDao().login(identifier, password)
-            ?: database.userDao().findByEmail(identifier)?.takeIf { it.password == password }
-        return if (user != null) persistAndReturn(user)
-        else AuthResult.Error("Identifiants incorrects")
     }
 
     /**
@@ -96,6 +103,18 @@ class AuthRepository(
                     client.auth.signUpWith(Email) {
                         this.email = email
                         this.password = password
+                    }
+                    // Si la confirmation d'email est désactivée, une session existe déjà ;
+                    // sinon on tente une connexion directe pour l'établir.
+                    if (client.auth.currentSessionOrNull() == null) {
+                        runCatching {
+                            client.auth.signInWith(Email) {
+                                this.email = email
+                                this.password = password
+                            }
+                        }.onFailure {
+                            Log.w(TAG, "Session en attente de confirmation d'email : ${it.message}")
+                        }
                     }
                     client.auth.currentUserOrNull()?.id?.let { userUuid = it }
                 } catch (e: Exception) {

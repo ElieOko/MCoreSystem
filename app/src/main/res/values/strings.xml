@@ -109,5 +109,6 @@
     <string name="sync_status_success">Données synchronisées</string>
     <string name="sync_status_error">Erreur de synchronisation, nouvel essai automatique</string>
     <string name="sync_status_offline">Mode hors ligne — les données seront synchronisées au retour du réseau</string>
+    <string name="sync_status_auth_required">Reconnectez-vous avec votre email pour synchroniser avec le cloud</string>
     <string name="error_generic">Une erreur est survenue. Veuillez réessayer.</string>
 </resources>

@@ -22,7 +22,7 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
         return try {
             val session = app.sessionRepository.session.first()
             if (session.isLoggedIn && session.organismUuid.isNotBlank()) {
-                app.syncManager.syncAll(session.organismUuid)
+                app.syncManager.syncAll(session.organismUuid, session.username, session.role)
             }
             Result.success()
         } catch (e: Exception) {
