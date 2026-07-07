@@ -70,20 +70,10 @@ data class RemoteOperation(
     @SerialName("updated_at") val updatedAt: String = ""
 )
 
-@Serializable
-data class RemoteProfile(
-    val uuid: String,
-    @SerialName("organism_uuid") val organismUuid: String,
-    val username: String = "",
-    val email: String? = null,
-    val phone: String? = null,
-    val role: String = "MEMBER",
-    @SerialName("updated_at") val updatedAt: String = ""
-)
-
 /**
  * Table `users` applicative : indépendante de auth.users.
- * Le mot de passe n'est jamais synchronisé vers le cloud.
+ * Seul le hash SHA-256 du mot de passe est synchronisé (jamais le mot de passe en clair),
+ * ce qui permet la connexion en ligne sans Supabase Auth.
  */
 @Serializable
 data class RemoteUser(
@@ -93,5 +83,6 @@ data class RemoteUser(
     val email: String? = null,
     val phone: String? = null,
     val role: String = "MEMBER",
+    @SerialName("password_hash") val passwordHash: String? = null,
     @SerialName("updated_at") val updatedAt: String = ""
 )

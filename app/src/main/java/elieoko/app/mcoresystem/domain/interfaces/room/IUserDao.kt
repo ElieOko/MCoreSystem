@@ -23,6 +23,9 @@ interface IUserDao {
     @Query("SELECT * FROM TUser WHERE email = :email LIMIT 1")
     fun findByEmail(email: String): UserModel?
 
+    @Query("SELECT * FROM TUser WHERE username = :username LIMIT 1")
+    fun findByUsername(username: String): UserModel?
+
     @Query("SELECT * FROM TUser WHERE uuid = :uuid LIMIT 1")
     fun findByUuid(uuid: String): UserModel?
 

@@ -30,6 +30,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import elieoko.app.mcoresystem.R
+import elieoko.app.mcoresystem.domain.model.AuthMode
 import elieoko.app.mcoresystem.domain.repository.AuthResult
 import elieoko.app.mcoresystem.domain.route.ScreenRoute
 import elieoko.app.mcoresystem.domain.viewmodel.config.ApplicationViewModel
@@ -49,6 +50,7 @@ fun LoginPage(
     var passwordVisible by remember { mutableStateOf(false) }
     var showError by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf("") }
+    var authMode by remember { mutableStateOf(AuthMode.AUTO) }
 
     val authResult by viewModelGlobal?.authResult?.collectAsState() ?: remember { mutableStateOf(null) }
     val isLoading by viewModelGlobal?.isAuthLoading?.collectAsState() ?: remember { mutableStateOf(false) }
@@ -134,6 +136,30 @@ fun LoginPage(
                     elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                 ) {
                     Column(Modifier.padding(24.dp)) {
+                        Text(
+                            text = stringResource(R.string.auth_mode),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Space(y = 6)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            FilterChip(
+                                selected = authMode == AuthMode.AUTO,
+                                onClick = { authMode = AuthMode.AUTO },
+                                label = { Text(stringResource(R.string.auth_mode_auto)) }
+                            )
+                            FilterChip(
+                                selected = authMode == AuthMode.LOCAL,
+                                onClick = { authMode = AuthMode.LOCAL },
+                                label = { Text(stringResource(R.string.auth_mode_local)) }
+                            )
+                            FilterChip(
+                                selected = authMode == AuthMode.ONLINE,
+                                onClick = { authMode = AuthMode.ONLINE },
+                                label = { Text(stringResource(R.string.auth_mode_online)) }
+                            )
+                        }
+                        Space(y = 12)
                         OutlinedTextField(
                             value = identifier,
                             onValueChange = { identifier = it; showError = false },
@@ -184,7 +210,7 @@ fun LoginPage(
                                         showError = true
                                         return@MCoreButton
                                     }
-                                    viewModelGlobal?.login(identifier.trim(), password)
+                                    viewModelGlobal?.login(identifier.trim(), password, authMode)
                                 }
                             )
                         }

@@ -4,16 +4,19 @@ import android.util.Log
 import elieoko.app.mcoresystem.data.preferences.SessionRepository
 import elieoko.app.mcoresystem.data.preferences.UserSession
 import elieoko.app.mcoresystem.data.remote.ChangeTracker
-import elieoko.app.mcoresystem.data.remote.RemoteProfile
+import elieoko.app.mcoresystem.data.remote.RemoteOrganism
+import elieoko.app.mcoresystem.data.remote.RemoteUser
 import elieoko.app.mcoresystem.data.remote.SupabaseProvider
 import elieoko.app.mcoresystem.data.remote.SyncManager
 import elieoko.app.mcoresystem.data.room.MCoreRoomDatabase
+import elieoko.app.mcoresystem.domain.model.AuthMode
 import elieoko.app.mcoresystem.domain.model.room.OrganismModel
 import elieoko.app.mcoresystem.domain.model.room.SyncQueueModel
 import elieoko.app.mcoresystem.domain.model.room.UserModel
+import elieoko.app.mcoresystem.domain.util.SecurityUtil
 import elieoko.app.mcoresystem.domain.util.TimeUtil
-import io.github.jan.supabase.auth.auth
-import io.github.jan.supabase.auth.providers.builtin.Email
+import io.github.jan.supabase.postgrest.from
+import io.github.jan.supabase.postgrest.query.Columns
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -24,13 +27,13 @@ sealed class AuthResult {
 }
 
 /**
- * Point d'entrée unique pour l'authentification.
+ * Authentification sans Supabase Auth : les comptes vivent dans la table
+ * applicative `users` (cloud) et dans Room (local).
  *
- * - Si Supabase est configuré : authentification cloud (email + mot de passe),
- *   session gérée et restaurée automatiquement par le SDK.
- * - Sinon (ou hors ligne) : repli transparent sur l'authentification locale Room.
- * La session applicative est persistée dans DataStore pour que l'utilisateur
- * reste connecté entre les lancements.
+ * Trois modes :
+ * - LOCAL  : Room uniquement.
+ * - ONLINE : table `users` Supabase uniquement (hash SHA-256 du mot de passe).
+ * - AUTO   : local d'abord, puis Supabase si le compte n'existe pas localement.
  */
 class AuthRepository(
     private val database: MCoreRoomDatabase,
@@ -38,47 +41,116 @@ class AuthRepository(
     private val syncManager: SyncManager
 ) {
 
-    suspend fun login(identifier: String, password: String): AuthResult = withContext(Dispatchers.IO) {
+    suspend fun login(
+        identifier: String,
+        password: String,
+        mode: AuthMode = AuthMode.AUTO
+    ): AuthResult = withContext(Dispatchers.IO) {
         try {
-            // 1. Résolution du compte local (par nom d'utilisateur ou par email).
-            var user = database.userDao().login(identifier, password)
-                ?: database.userDao().findByEmail(identifier)?.takeIf { it.password == password }
-
-            val client = SupabaseProvider.client
-            // Email à utiliser pour la session cloud : l'identifiant s'il en est un,
-            // sinon l'email enregistré sur le compte local.
-            val email = if (identifier.contains("@")) identifier else user?.email
-
-            // 2. Session Supabase (indispensable pour passer les politiques RLS).
-            if (client != null && !email.isNullOrBlank()) {
-                try {
-                    client.auth.signInWith(Email) {
-                        this.email = email
-                        this.password = password
-                    }
-                    // Aligne l'utilisateur local sur l'identifiant Supabase Auth.
-                    val authUid = client.auth.currentUserOrNull()?.id
-                    if (user == null) user = database.userDao().findByEmail(email)
-                    if (authUid != null && user != null && user.uuid != authUid) {
-                        user = user.copy(uuid = authUid)
-                        database.userDao().updateAll(user)
-                    }
-                } catch (e: Exception) {
-                    Log.w(TAG, "Connexion Supabase impossible, repli local : ${e.message}")
+            when (mode) {
+                AuthMode.LOCAL -> localLogin(identifier, password)
+                    ?: AuthResult.Error("Identifiants incorrects (compte local introuvable)")
+                AuthMode.ONLINE -> onlineLogin(identifier, password)
+                AuthMode.AUTO -> {
+                    localLogin(identifier, password)
+                        ?: if (localAccountExists(identifier)) {
+                            AuthResult.Error("Identifiants incorrects")
+                        } else {
+                            onlineLogin(identifier, password)
+                        }
                 }
             }
-
-            if (user != null) persistAndReturn(user)
-            else AuthResult.Error("Identifiants incorrects")
         } catch (e: Exception) {
             Log.e(TAG, "Erreur de connexion", e)
             AuthResult.Error(e.message ?: "Erreur de connexion")
         }
     }
 
+    private fun localAccountExists(identifier: String): Boolean =
+        database.userDao().findByEmail(identifier) != null ||
+            database.userDao().findByUsername(identifier) != null
+
+    private suspend fun localLogin(identifier: String, password: String): AuthResult? {
+        val user = database.userDao().login(identifier, password)
+            ?: database.userDao().findByEmail(identifier)?.takeIf { it.password == password }
+        return user?.let { persistAndReturn(it) }
+    }
+
+    /** Connexion contre la table `users` de Supabase (hash du mot de passe). */
+    private suspend fun onlineLogin(identifier: String, password: String): AuthResult {
+        val client = SupabaseProvider.client
+            ?: return AuthResult.Error("Supabase n'est pas configuré : utilisez le mode local")
+        return try {
+            val candidates = client.from(SyncManager.TABLE_USERS).select(Columns.ALL) {
+                filter {
+                    or {
+                        eq("username", identifier)
+                        eq("email", identifier)
+                    }
+                }
+            }.decodeList<RemoteUser>()
+
+            val hash = SecurityUtil.sha256(password)
+            val remote = candidates.firstOrNull { it.passwordHash == hash }
+                ?: return AuthResult.Error(
+                    if (candidates.isEmpty()) "Compte introuvable sur le cloud"
+                    else "Mot de passe incorrect"
+                )
+
+            // Rapatrie l'organisation puis le compte dans Room (cache local).
+            val organism = ensureLocalOrganism(client, remote.organismUuid)
+            val existing = database.userDao().findByUuid(remote.uuid)
+            val user = if (existing == null) {
+                UserModel(
+                    id = database.userDao().countUsers() + 1,
+                    username = remote.username,
+                    phone = remote.phone,
+                    email = remote.email,
+                    password = password, // en clair uniquement en local, pour le mode hors ligne
+                    organismId = organism?.id ?: 1,
+                    role = remote.role,
+                    uuid = remote.uuid,
+                    updatedAt = remote.updatedAt
+                ).also { database.userDao().insertAll(it) }
+            } else {
+                existing.copy(
+                    username = remote.username,
+                    email = remote.email,
+                    phone = remote.phone,
+                    password = password,
+                    role = remote.role
+                ).also { database.userDao().updateAll(it) }
+            }
+            persistAndReturn(user)
+        } catch (e: Exception) {
+            Log.e(TAG, "Connexion en ligne impossible", e)
+            AuthResult.Error("Connexion en ligne impossible : ${e.message}")
+        }
+    }
+
+    private suspend fun ensureLocalOrganism(
+        client: io.github.jan.supabase.SupabaseClient,
+        organismUuid: String
+    ): OrganismModel? {
+        database.organismDao().findByUuid(organismUuid)?.let { return it }
+        val remote = runCatching {
+            client.from(SyncManager.TABLE_ORGANISMS).select(Columns.ALL) {
+                filter { eq("uuid", organismUuid) }
+            }.decodeList<RemoteOrganism>().firstOrNull()
+        }.getOrNull() ?: return null
+        val organism = OrganismModel(
+            id = (database.organismDao().getAll().maxOfOrNull { it.id } ?: 0) + 1,
+            name = remote.name,
+            uuid = remote.uuid,
+            updatedAt = remote.updatedAt
+        )
+        database.organismDao().insertAll(organism)
+        return organism
+    }
+
     /**
-     * Inscription : crée l'organisation (si nécessaire), le compte utilisateur,
-     * définit l'utilisateur comme administrateur, puis pousse le tout vers Supabase.
+     * Inscription : organisation + compte administrateur, créés localement puis
+     * synchronisés vers la table `users` du cloud (jamais dans Supabase Auth).
      */
     suspend fun register(
         username: String,
@@ -89,7 +161,6 @@ class AuthRepository(
     ): AuthResult = withContext(Dispatchers.IO) {
         try {
             val now = TimeUtil.nowIso()
-            // 1. Organisation locale
             val existing = database.organismDao().getAll().firstOrNull { it.name == organizationName }
             val organism = existing ?: OrganismModel(
                 id = (database.organismDao().getAll().maxOfOrNull { it.id } ?: 0) + 1,
@@ -97,67 +168,21 @@ class AuthRepository(
                 updatedAt = now
             ).also { database.organismDao().insertAll(it) }
 
-            // 2. Compte Supabase (si configuré et email fourni)
-            val client = SupabaseProvider.client
-            var userUuid = java.util.UUID.randomUUID().toString()
-            if (client != null && !email.isNullOrBlank()) {
-                try {
-                    client.auth.signUpWith(Email) {
-                        this.email = email
-                        this.password = password
-                    }
-                    // Si la confirmation d'email est désactivée, une session existe déjà ;
-                    // sinon on tente une connexion directe pour l'établir.
-                    if (client.auth.currentSessionOrNull() == null) {
-                        runCatching {
-                            client.auth.signInWith(Email) {
-                                this.email = email
-                                this.password = password
-                            }
-                        }.onFailure {
-                            Log.w(TAG, "Session en attente de confirmation d'email : ${it.message}")
-                        }
-                    }
-                    client.auth.currentUserOrNull()?.id?.let { userUuid = it }
-                } catch (e: Exception) {
-                    Log.w(TAG, "Inscription Supabase impossible (mode hors ligne) : ${e.message}")
-                }
-            }
-
-            // 3. Utilisateur local, administrateur de l'organisation.
-            //    Enregistré dans la file de sync : il rejoindra la table `users`
-            //    applicative (indépendante de auth.users) dès la première synchronisation.
-            val userId = database.userDao().countUsers() + 1
             val user = UserModel(
-                id = userId,
+                id = database.userDao().countUsers() + 1,
                 username = username,
                 phone = phone,
                 email = email,
                 password = password,
                 organismId = organism.id,
                 role = ROLE_ADMIN,
-                uuid = userUuid,
                 updatedAt = now
             )
             database.userDao().insertAll(user)
+            // Fera partir le compte vers la table `users` du cloud à la prochaine sync.
             ChangeTracker(database.syncQueueDao()).recordUpsert(SyncQueueModel.TYPE_USER, user.uuid)
+            syncManager.pushOrganism(organism)
 
-            // 4. Pousse organisation + profil uniquement si une session Supabase existe
-            //    (le profil exige uuid = auth.uid() ; jamais d'UUID aléatoire).
-            if (SupabaseProvider.client?.auth?.currentSessionOrNull() != null) {
-                syncManager.pushOrganism(organism)
-                syncManager.pushProfile(
-                    RemoteProfile(
-                        uuid = userUuid,
-                        organismUuid = organism.uuid,
-                        username = username,
-                        email = email,
-                        phone = phone,
-                        role = ROLE_ADMIN,
-                        updatedAt = now
-                    )
-                )
-            }
             persistAndReturn(user)
         } catch (e: Exception) {
             Log.e(TAG, "Erreur d'inscription", e)
@@ -165,18 +190,12 @@ class AuthRepository(
         }
     }
 
-    /** Restaure la session persistée (démarrage de l'application). */
     suspend fun restoreSession(): UserSession? {
         val session = sessionRepository.session.first()
         return if (session.isLoggedIn) session else null
     }
 
     suspend fun logout() {
-        try {
-            SupabaseProvider.client?.auth?.signOut()
-        } catch (e: Exception) {
-            Log.w(TAG, "Déconnexion Supabase : ${e.message}")
-        }
         sessionRepository.clear()
     }
 
