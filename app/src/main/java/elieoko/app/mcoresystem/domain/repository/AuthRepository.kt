@@ -3,11 +3,13 @@ package elieoko.app.mcoresystem.domain.repository
 import android.util.Log
 import elieoko.app.mcoresystem.data.preferences.SessionRepository
 import elieoko.app.mcoresystem.data.preferences.UserSession
+import elieoko.app.mcoresystem.data.remote.ChangeTracker
 import elieoko.app.mcoresystem.data.remote.RemoteProfile
 import elieoko.app.mcoresystem.data.remote.SupabaseProvider
 import elieoko.app.mcoresystem.data.remote.SyncManager
 import elieoko.app.mcoresystem.data.room.MCoreRoomDatabase
 import elieoko.app.mcoresystem.domain.model.room.OrganismModel
+import elieoko.app.mcoresystem.domain.model.room.SyncQueueModel
 import elieoko.app.mcoresystem.domain.model.room.UserModel
 import elieoko.app.mcoresystem.domain.util.TimeUtil
 import io.github.jan.supabase.auth.auth
@@ -122,7 +124,9 @@ class AuthRepository(
                 }
             }
 
-            // 3. Utilisateur local, administrateur de l'organisation
+            // 3. Utilisateur local, administrateur de l'organisation.
+            //    Enregistré dans la file de sync : il rejoindra la table `users`
+            //    applicative (indépendante de auth.users) dès la première synchronisation.
             val userId = database.userDao().countUsers() + 1
             val user = UserModel(
                 id = userId,
@@ -136,20 +140,24 @@ class AuthRepository(
                 updatedAt = now
             )
             database.userDao().insertAll(user)
+            ChangeTracker(database.syncQueueDao()).recordUpsert(SyncQueueModel.TYPE_USER, user.uuid)
 
-            // 4. Pousse organisation + profil vers Supabase
-            syncManager.pushOrganism(organism)
-            syncManager.pushProfile(
-                RemoteProfile(
-                    uuid = userUuid,
-                    organismUuid = organism.uuid,
-                    username = username,
-                    email = email,
-                    phone = phone,
-                    role = ROLE_ADMIN,
-                    updatedAt = now
+            // 4. Pousse organisation + profil uniquement si une session Supabase existe
+            //    (le profil exige uuid = auth.uid() ; jamais d'UUID aléatoire).
+            if (SupabaseProvider.client?.auth?.currentSessionOrNull() != null) {
+                syncManager.pushOrganism(organism)
+                syncManager.pushProfile(
+                    RemoteProfile(
+                        uuid = userUuid,
+                        organismUuid = organism.uuid,
+                        username = username,
+                        email = email,
+                        phone = phone,
+                        role = ROLE_ADMIN,
+                        updatedAt = now
+                    )
                 )
-            )
+            }
             persistAndReturn(user)
         } catch (e: Exception) {
             Log.e(TAG, "Erreur d'inscription", e)

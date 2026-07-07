@@ -189,6 +189,20 @@ class SyncManager(private val database: MCoreRoomDatabase) {
                     )
                 ) { onConflict = "uuid" }
             }
+            SyncQueueModel.TYPE_USER -> {
+                val local = database.userDao().findByUuid(entry.entityUuid) ?: return
+                client.from(TABLE_USERS).upsert(
+                    RemoteUser(
+                        uuid = local.uuid,
+                        organismUuid = organismUuidFor(local.organismId),
+                        username = local.username,
+                        email = local.email,
+                        phone = local.phone,
+                        role = local.role,
+                        updatedAt = local.updatedAt.ifBlank { TimeUtil.nowIso() }
+                    )
+                ) { onConflict = "uuid" }
+            }
             SyncQueueModel.TYPE_OPERATION -> {
                 val local = database.operationDao().findByUuid(entry.entityUuid) ?: return
                 client.from(TABLE_OPERATIONS).upsert(
@@ -250,6 +264,41 @@ class SyncManager(private val database: MCoreRoomDatabase) {
         }
 
         val localOrganismId = database.organismDao().findByUuid(organismUuid)?.id ?: 1
+
+        // Table users applicative (indépendante de auth.users) : partage des membres
+        // de l'organisation entre appareils. Le mot de passe reste local.
+        val remoteUsers = client.from(TABLE_USERS).select(Columns.ALL) {
+            filter { eq("organism_uuid", organismUuid) }
+        }.decodeList<RemoteUser>()
+        for (remote in remoteUsers) {
+            if (remote.uuid in pendingUuids) continue
+            val local = database.userDao().findByUuid(remote.uuid)
+            if (local == null) {
+                database.userDao().insertAll(
+                    elieoko.app.mcoresystem.domain.model.room.UserModel(
+                        id = database.userDao().countUsers() + 1,
+                        username = remote.username,
+                        phone = remote.phone,
+                        email = remote.email,
+                        password = "",
+                        organismId = localOrganismId,
+                        role = remote.role,
+                        uuid = remote.uuid,
+                        updatedAt = remote.updatedAt
+                    )
+                )
+            } else if (TimeUtil.isNewer(remote.updatedAt, local.updatedAt)) {
+                database.userDao().updateAll(
+                    local.copy(
+                        username = remote.username,
+                        phone = remote.phone,
+                        email = remote.email,
+                        role = remote.role,
+                        updatedAt = remote.updatedAt
+                    )
+                )
+            }
+        }
 
         val remoteTypes = client.from(TABLE_TYPE_CATEGORIES).select(Columns.ALL) {
             filter { eq("organism_uuid", organismUuid) }
@@ -363,6 +412,7 @@ class SyncManager(private val database: MCoreRoomDatabase) {
         SyncQueueModel.TYPE_TYPE_CATEGORY -> TABLE_TYPE_CATEGORIES
         SyncQueueModel.TYPE_OPERATION -> TABLE_OPERATIONS
         SyncQueueModel.TYPE_ORGANISM -> TABLE_ORGANISMS
+        SyncQueueModel.TYPE_USER -> TABLE_USERS
         else -> null
     }
 
@@ -370,6 +420,7 @@ class SyncManager(private val database: MCoreRoomDatabase) {
         private const val TAG = "SyncManager"
         const val TABLE_ORGANISMS = "organisms"
         const val TABLE_PROFILES = "profiles"
+        const val TABLE_USERS = "users"
         const val TABLE_CURRENCIES = "currencies"
         const val TABLE_PAYMENT_METHODS = "payment_methods"
         const val TABLE_TYPE_CATEGORIES = "type_categories"

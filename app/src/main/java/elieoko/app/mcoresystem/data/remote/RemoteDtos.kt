@@ -80,3 +80,18 @@ data class RemoteProfile(
     val role: String = "MEMBER",
     @SerialName("updated_at") val updatedAt: String = ""
 )
+
+/**
+ * Table `users` applicative : indépendante de auth.users.
+ * Le mot de passe n'est jamais synchronisé vers le cloud.
+ */
+@Serializable
+data class RemoteUser(
+    val uuid: String,
+    @SerialName("organism_uuid") val organismUuid: String,
+    val username: String = "",
+    val email: String? = null,
+    val phone: String? = null,
+    val role: String = "MEMBER",
+    @SerialName("updated_at") val updatedAt: String = ""
+)
