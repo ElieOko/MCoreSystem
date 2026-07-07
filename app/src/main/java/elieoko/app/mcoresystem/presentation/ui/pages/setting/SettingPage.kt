@@ -190,7 +190,6 @@ fun SettingPage(
                         elieoko.app.mcoresystem.data.remote.SyncStatus.SYNCING -> stringResource(R.string.sync_status_syncing)
                         elieoko.app.mcoresystem.data.remote.SyncStatus.SUCCESS -> stringResource(R.string.sync_status_success)
                         elieoko.app.mcoresystem.data.remote.SyncStatus.ERROR -> stringResource(R.string.sync_status_error)
-                        elieoko.app.mcoresystem.data.remote.SyncStatus.AUTH_REQUIRED -> stringResource(R.string.sync_status_auth_required)
                         else -> stringResource(R.string.sync_status_offline)
                     }
                     ManageableRow(

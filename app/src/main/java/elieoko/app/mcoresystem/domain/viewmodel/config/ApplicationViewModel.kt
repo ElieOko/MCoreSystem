@@ -87,10 +87,10 @@ class ApplicationViewModel(
         }
     }
 
-    fun login(identifier: String, password: String) {
+    fun login(identifier: String, password: String, mode: elieoko.app.mcoresystem.domain.model.AuthMode = elieoko.app.mcoresystem.domain.model.AuthMode.AUTO) {
         viewModelScope.launch {
             _isAuthLoading.value = true
-            _authResult.value = authRepository?.login(identifier, password)
+            _authResult.value = authRepository?.login(identifier, password, mode)
             _isAuthLoading.value = false
             if (_authResult.value is AuthResult.Success) requestSync()
         }
