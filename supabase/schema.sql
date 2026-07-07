@@ -16,7 +16,8 @@ create table if not exists public.organisms (
     updated_at timestamptz not null default now()
 );
 
--- Profil applicatif : uuid = auth.users.id
+-- Pont technique de sécurité : uuid = auth.users.id.
+-- Sert UNIQUEMENT à relier la personne connectée à son organisation (RLS).
 create table if not exists public.profiles (
     uuid uuid primary key references auth.users (id) on delete cascade,
     organism_uuid uuid not null references public.organisms (uuid) on delete cascade,
@@ -26,6 +27,21 @@ create table if not exists public.profiles (
     role text not null default 'MEMBER', -- ADMIN | MEMBER
     updated_at timestamptz not null default now()
 );
+
+-- Table utilisateurs APPLICATIVE : totalement indépendante de auth.users.
+-- C'est ici que vivent les membres de chaque organisation (le mot de passe
+-- n'est jamais synchronisé, il reste local à l'appareil).
+create table if not exists public.users (
+    uuid uuid primary key default gen_random_uuid(),
+    organism_uuid uuid not null references public.organisms (uuid) on delete cascade,
+    username text not null default '',
+    email text,
+    phone text,
+    role text not null default 'MEMBER', -- ADMIN | MEMBER
+    updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_users_org on public.users (organism_uuid);
 
 create table if not exists public.currencies (
     uuid uuid primary key default gen_random_uuid(),
@@ -100,6 +116,7 @@ $$;
 
 alter table public.organisms enable row level security;
 alter table public.profiles enable row level security;
+alter table public.users enable row level security;
 alter table public.currencies enable row level security;
 alter table public.payment_methods enable row level security;
 alter table public.type_categories enable row level security;
@@ -141,7 +158,7 @@ do $$
 declare
     t text;
 begin
-    foreach t in array array['currencies','payment_methods','type_categories','categories','operations']
+    foreach t in array array['users','currencies','payment_methods','type_categories','categories','operations']
     loop
         execute format('drop policy if exists %I_select on public.%I', t, t);
         execute format(

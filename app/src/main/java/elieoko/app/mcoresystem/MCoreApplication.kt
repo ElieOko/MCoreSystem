@@ -20,7 +20,7 @@ class MCoreApplication : Application() {
     val database by lazy { MCoreRoomDatabase.getDatabase(this, applicationScope) }
     private val changeTracker by lazy { ChangeTracker(database.syncQueueDao()) }
 
-    val userRepository by lazy { UserRepository(database.userDao()) }
+    val userRepository by lazy { UserRepository(database.userDao(), changeTracker) }
     val paymentMethodRepository by lazy { PaymentMethodRepository(database.paymentMethodDao(), changeTracker) }
     val currencyRepository by lazy { CurrencyRepository(database.currencyDao(), changeTracker) }
     val categoryRepository by lazy { CategorieRepository(database.categoryDao(), changeTracker) }
