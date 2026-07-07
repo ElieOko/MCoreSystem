@@ -95,9 +95,13 @@ fun HomePage(navC: NavHostController? = null, viewModelGlobal: ApplicationViewMo
     var visible by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { visible = true }
 
+    val organismName = viewModelGlobal?.currentOrganismName?.value?.ifBlank { null }
+        ?: stringResource(R.string.app_name)
+
     Scaffold(
         topBar = {
             TopBarSimple(
+                title = organismName,
                 onclick = { navC?.navigate(ScreenRoute.Setting.name) },
                 onclickLogOut = {
                     // Déconnexion volontaire : la session persistée est effacée.

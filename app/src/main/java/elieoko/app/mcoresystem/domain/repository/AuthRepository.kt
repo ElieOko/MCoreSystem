@@ -207,6 +207,7 @@ class AuthRepository(
             username = user.username,
             organismId = user.organismId,
             organismUuid = organism?.uuid ?: "",
+            organismName = organism?.name ?: "",
             userUuid = user.uuid,
             role = user.role
         )

@@ -186,6 +186,11 @@ fun SettingPage(
             MCoreCard {
                 Column(Modifier.padding(vertical = 4.dp)) {
                     InfoRow(Icons.Default.Person, stringResource(R.string.user), username)
+                    InfoRow(
+                        Icons.Default.Business,
+                        stringResource(R.string.organism),
+                        viewModelGlobal?.currentOrganismName?.value?.ifBlank { "—" } ?: "—"
+                    )
                     val syncLabel = when (syncStatus) {
                         elieoko.app.mcoresystem.data.remote.SyncStatus.SYNCING -> stringResource(R.string.sync_status_syncing)
                         elieoko.app.mcoresystem.data.remote.SyncStatus.SUCCESS -> stringResource(R.string.sync_status_success)

@@ -328,6 +328,10 @@ private fun OperationFormSheet(
                 MCoreOutlinedButton(text = stringResource(R.string.add_currency), onClick = onCreateCurrency)
                 Space(y = 8)
             }
+            if (categories.isEmpty()) {
+                AnimatedFeedback(visible = true, message = stringResource(R.string.no_category_hint), isError = true)
+                Space(y = 8)
+            }
             MCoreTextField(
                 value = taskName,
                 onValueChange = { taskName = it },

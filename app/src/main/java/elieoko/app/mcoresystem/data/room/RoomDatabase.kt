@@ -4,7 +4,6 @@ import android.content.Context
 import android.util.Log
 import androidx.room.*
 import androidx.sqlite.db.SupportSQLiteDatabase
-import elieoko.app.mcoresystem.data.preferences.ExchangeRateRepository
 import elieoko.app.mcoresystem.domain.interfaces.room.*
 import elieoko.app.mcoresystem.domain.model.room.*
 import kotlinx.coroutines.*
@@ -35,7 +34,6 @@ abstract class MCoreRoomDatabase : RoomDatabase() {
                         Log.d("ROOM_SQL", "SQL Query: $sqlQuery SQL Args: $bindArgs")
                     }, Executors.newSingleThreadExecutor())
                     .fallbackToDestructiveMigration(true)
-                    .addCallback(MCoreDatabaseCallback(scope))
                     .addCallback(object : Callback() {
                         override fun onOpen(db: SupportSQLiteDatabase) {
                             super.onOpen(db)
@@ -49,65 +47,6 @@ abstract class MCoreRoomDatabase : RoomDatabase() {
             }
         }
     }
-    private class MCoreDatabaseCallback(
-        private val scope: CoroutineScope
-    ) : Callback() {
-        override fun onCreate(db: SupportSQLiteDatabase) {
-            super.onCreate(db)
-            INSTANCE?.let { database -> scope.launch { seedDefaults(database) } }
-        }
-
-        override fun onOpen(db: SupportSQLiteDatabase) {
-            super.onOpen(db)
-            INSTANCE?.let { database -> scope.launch { seedDefaults(database) } }
-        }
-
-        private suspend fun seedDefaults(database: MCoreRoomDatabase) {
-            withContext(Dispatchers.IO) {
-                val currencyDao = database.currencyDao()
-                if (currencyDao.getAll().isEmpty()) {
-                    currencyDao.insertAll(
-                        CurrencyModel(
-                            id = ExchangeRateRepository.CURRENCY_CDF_ID,
-                            name = "Franc Congolais",
-                            code = ExchangeRateRepository.CURRENCY_CDF_CODE,
-                            symbol = "FC"
-                        ),
-                        CurrencyModel(
-                            id = ExchangeRateRepository.CURRENCY_USD_ID,
-                            name = "Dollar Américain",
-                            code = ExchangeRateRepository.CURRENCY_USD_CODE,
-                            symbol = "$"
-                        )
-                    )
-                }
-                val paymentDao = database.paymentMethodDao()
-                if (paymentDao.getAll().isEmpty()) {
-                    paymentDao.insertAll(
-                        PaymentMethodModel(id = 1, name = "Espèces"),
-                        PaymentMethodModel(id = 2, name = "Mobile Money"),
-                        PaymentMethodModel(id = 3, name = "Virement bancaire")
-                    )
-                }
-                val organismDao = database.organismDao()
-                if (organismDao.getAll().isEmpty()) {
-                    organismDao.insertAll(OrganismModel(id = 1, name = "MCoreSystem"))
-                }
-                val typeCategoryDao = database.typeCategoryDao()
-                if (typeCategoryDao.getAll().isEmpty()) {
-                    typeCategoryDao.insertAll(
-                        TypeCategoryModel(id = 1, organismId = 1, name = "Recette", description = "Entrées d'argent"),
-                        TypeCategoryModel(id = 2, organismId = 1, name = "Dépense", description = "Sorties d'argent")
-                    )
-                }
-                val categoryDao = database.categoryDao()
-                if (categoryDao.getAll().isEmpty()) {
-                    categoryDao.insertAll(
-                        CategoryModel(id = 1, organismId = 1, typeCategoryId = 1, name = "Vente", description = "Ventes diverses"),
-                        CategoryModel(id = 2, organismId = 1, typeCategoryId = 2, name = "Achat", description = "Achats divers")
-                    )
-                }
-            }
-        }
-    }
+    // Aucune donnée n'est créée par défaut : l'utilisateur crée son organisation
+    // à l'inscription, puis ses devises, types, catégories et modes de paiement.
 }
