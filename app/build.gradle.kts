@@ -15,8 +15,10 @@ val localProperties = Properties().apply {
     if (file.exists()) file.inputStream().use { load(it) }
 }
 
-fun secret(name: String): String =
-    localProperties.getProperty(name) ?: System.getenv(name) ?: ""
+fun secret(vararg names: String): String =
+    names.firstNotNullOfOrNull { name ->
+        (localProperties.getProperty(name) ?: System.getenv(name))?.takeIf { it.isNotBlank() }
+    } ?: ""
 
 android {
     namespace = "elieoko.app.mcoresystem"
@@ -43,8 +45,13 @@ android {
             }
         }
 
+        // Accepte l'ancien format (anon key JWT) comme le nouveau (sb_publishable_...).
         buildConfigField("String", "SUPABASE_URL", "\"${secret("SUPABASE_URL")}\"")
-        buildConfigField("String", "SUPABASE_ANON_KEY", "\"${secret("SUPABASE_ANON_KEY")}\"")
+        buildConfigField(
+            "String",
+            "SUPABASE_ANON_KEY",
+            "\"${secret("SUPABASE_ANON_KEY", "SUPABASE_PUBLISHABLE_KEY")}\""
+        )
     }
 
     buildTypes {
