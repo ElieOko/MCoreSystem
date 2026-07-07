@@ -19,6 +19,7 @@ data class UserSession(
     val username: String = "",
     val organismId: Int = 1,
     val organismUuid: String = "",
+    val organismName: String = "",
     val userUuid: String = "",
     val role: String = "MEMBER"
 )
@@ -35,6 +36,7 @@ class SessionRepository(private val context: Context) {
         val USERNAME = stringPreferencesKey("username")
         val ORGANISM_ID = intPreferencesKey("organism_id")
         val ORGANISM_UUID = stringPreferencesKey("organism_uuid")
+        val ORGANISM_NAME = stringPreferencesKey("organism_name")
         val USER_UUID = stringPreferencesKey("user_uuid")
         val ROLE = stringPreferencesKey("role")
     }
@@ -46,6 +48,7 @@ class SessionRepository(private val context: Context) {
             username = prefs[Keys.USERNAME] ?: "",
             organismId = prefs[Keys.ORGANISM_ID] ?: 1,
             organismUuid = prefs[Keys.ORGANISM_UUID] ?: "",
+            organismName = prefs[Keys.ORGANISM_NAME] ?: "",
             userUuid = prefs[Keys.USER_UUID] ?: "",
             role = prefs[Keys.ROLE] ?: "MEMBER"
         )
@@ -58,6 +61,7 @@ class SessionRepository(private val context: Context) {
             prefs[Keys.USERNAME] = session.username
             prefs[Keys.ORGANISM_ID] = session.organismId
             prefs[Keys.ORGANISM_UUID] = session.organismUuid
+            prefs[Keys.ORGANISM_NAME] = session.organismName
             prefs[Keys.USER_UUID] = session.userUuid
             prefs[Keys.ROLE] = session.role
         }
