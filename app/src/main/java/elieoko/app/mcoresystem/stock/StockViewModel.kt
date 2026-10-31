@@ -1,8 +1,13 @@
 package elieoko.app.mcoresystem.stock
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import elieoko.app.mcoresystem.MCoreApplication
+import elieoko.app.mcoresystem.data.remote.ChangeTracker
+import elieoko.app.mcoresystem.domain.model.room.SyncQueueModel
+import elieoko.app.mcoresystem.domain.model.room.UserModel
 import elieoko.app.mcoresystem.stock.data.DeliveryLine
 import elieoko.app.mcoresystem.stock.data.MiniStockLine
 import elieoko.app.mcoresystem.stock.data.StockAuth
@@ -12,25 +17,39 @@ import elieoko.app.mcoresystem.stock.data.StockOrder
 import elieoko.app.mcoresystem.stock.data.StockProduct
 import elieoko.app.mcoresystem.stock.data.StockRepository
 import elieoko.app.mcoresystem.stock.data.StockResult
-import elieoko.app.mcoresystem.stock.data.StockRole
 import elieoko.app.mcoresystem.stock.data.StockSession
 import elieoko.app.mcoresystem.stock.data.StockSessionStore
+import elieoko.app.mcoresystem.stock.data.StockSync
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.util.UUID
+
+data class StockAccess(
+    val organismUuid: String,
+    val organismName: String,
+    val financeOrganismId: Int,
+    val userUuid: String,
+    val username: String,
+    val role: String
+)
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class StockViewModel(application: Application) : AndroidViewModel(application) {
-    private val repository = StockRepository(StockDatabase.get(application))
+    private val database = StockDatabase.get(application)
+    private val repository = StockRepository(database)
+    private val sync = StockSync(database)
     private val sessionStore = StockSessionStore(application)
+    private var financeOrganismId: Int = 0
     private val messages = MutableSharedFlow<String>(extraBufferCapacity = 1)
     private val sessionState = MutableStateFlow<StockSession?>(null)
     private val readyState = MutableStateFlow(false)
@@ -72,12 +91,42 @@ class StockViewModel(application: Application) : AndroidViewModel(application) {
         if (current == null) flowOf(emptyList()) else repository.observeAccounts(current.organismId)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    init {
+    fun bind(access: StockAccess) {
+        val current = sessionState.value
+        if (
+            readyState.value &&
+            current != null &&
+            current.organismUuid == access.organismUuid &&
+            current.username == access.username &&
+            current.role == access.role
+        ) {
+            return
+        }
         viewModelScope.launch {
-            sessionStore.session.collect { saved ->
-                sessionState.value = saved
-                readyState.value = true
+            financeOrganismId = access.financeOrganismId
+            val organism = repository.ensureOrganism(access.organismUuid, access.organismName)
+            val livreur = if (access.role.equals("LIVREUR", ignoreCase = true)) {
+                repository.livreurByUserUuid(access.userUuid)
+            } else {
+                null
             }
+            val opened = StockSession(
+                accountId = 0,
+                organismId = organism.id,
+                organismUuid = organism.uuid,
+                organismName = organism.name,
+                username = access.username,
+                role = access.role,
+                livreurId = livreur?.id ?: 0,
+                livreurName = livreur?.name ?: ""
+            )
+            sessionStore.save(opened)
+            sessionState.value = opened
+            readyState.value = true
+            if (opened.isLivreur && livreur == null) {
+                messages.emit("Ce compte n'est pas encore lié à un livreur du stock.")
+            }
+            publishCloud()?.let { messages.emit("Cloud : $it") }
         }
     }
 
@@ -118,10 +167,19 @@ class StockViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun logout() {
-        viewModelScope.launch { sessionStore.clear() }
+        viewModelScope.launch {
+            sessionStore.clear()
+            sessionState.value = null
+        }
     }
 
-    fun createProduct(name: String, unit: String, initialQuantityRaw: String, onDone: (Boolean) -> Unit = {}) {
+    fun createProduct(
+        name: String,
+        unit: String,
+        initialQuantityRaw: String,
+        priceRaw: String,
+        onDone: (Boolean) -> Unit = {}
+    ) {
         val organism = ownerOrganism() ?: run { onDone(false); return }
         val quantity = if (initialQuantityRaw.isBlank()) 0.0 else StockRules.parseQuantity(initialQuantityRaw)
         if (initialQuantityRaw.isNotBlank() && quantity == null) {
@@ -129,17 +187,35 @@ class StockViewModel(application: Application) : AndroidViewModel(application) {
             onDone(false)
             return
         }
+        val price = StockRules.parseAmount(priceRaw)
+        if (price == null) {
+            messages.tryEmit("Montant invalide")
+            onDone(false)
+            return
+        }
         launch("Article enregistré", onDone) {
-            repository.createProduct(organism, name, unit, quantity ?: 0.0)
+            repository.createProduct(organism, name, unit, quantity ?: 0.0, price)
         }
     }
 
-    fun renameProduct(product: StockProduct, name: String, unit: String, onDone: (Boolean) -> Unit = {}) {
+    fun renameProduct(
+        product: StockProduct,
+        name: String,
+        unit: String,
+        priceRaw: String,
+        onDone: (Boolean) -> Unit = {}
+    ) {
         if (ownerOrganism() == null) {
             onDone(false)
             return
         }
-        launch("Article mis à jour", onDone) { repository.renameProduct(product.id, name, unit) }
+        val price = StockRules.parseAmount(priceRaw)
+        if (price == null) {
+            messages.tryEmit("Montant invalide")
+            onDone(false)
+            return
+        }
+        launch("Article mis à jour", onDone) { repository.renameProduct(product.id, name, unit, price) }
     }
 
     fun deleteProduct(product: StockProduct, onDone: (Boolean) -> Unit = {}) {
@@ -186,8 +262,46 @@ class StockViewModel(application: Application) : AndroidViewModel(application) {
         onDone: (Boolean) -> Unit = {}
     ) {
         val organism = ownerOrganism() ?: run { onDone(false); return }
-        launch("Livreur enregistré. Il peut se connecter avec son identifiant.", onDone) {
-            repository.createLivreur(organism, name, phone, username, password)
+        val login = StockRules.normalizeUsername(username)
+        if (login == null) {
+            messages.tryEmit("Identifiant invalide : 3 caractères minimum, sans espace")
+            onDone(false)
+            return
+        }
+        StockRules.passwordError(password)?.let {
+            messages.tryEmit(it)
+            onDone(false)
+            return
+        }
+        launch("Livreur enregistré. Il se connecte avec la même page que l'organisation.", onDone) {
+            val app = getApplication<MCoreApplication>()
+            val users = app.database.userDao()
+            if (users.findByUsername(login) != null) {
+                return@launch StockResult.Error("Cet identifiant est déjà utilisé")
+            }
+            val userUuid = UUID.randomUUID().toString()
+            var nextId = users.countUsers() + 1
+            while (users.loadAllById(nextId).isNotEmpty()) nextId++
+            app.userRepository.insert(
+                UserModel(
+                    id = nextId,
+                    username = login,
+                    phone = phone.trim().ifBlank { null },
+                    email = null,
+                    password = password,
+                    organismId = financeOrganismId.takeIf { it > 0 } ?: 1,
+                    role = "LIVREUR",
+                    uuid = userUuid
+                )
+            )
+            val result = repository.createLivreur(organism, name, phone, username, password, userUuid)
+            if (result is StockResult.Error) {
+                users.findByUuid(userUuid)?.let { created ->
+                    users.delete(created)
+                    ChangeTracker(app.database.syncQueueDao()).recordDelete(SyncQueueModel.TYPE_USER, userUuid)
+                }
+            }
+            result
         }
     }
 
@@ -204,7 +318,9 @@ class StockViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
         launch("Livreur mis à jour", onDone) {
-            repository.renameLivreur(livreur.id, name, phone, username, password.ifBlank { null })
+            val result = repository.renameLivreur(livreur.id, name, phone, username, password.ifBlank { null })
+            if (result is StockResult.Ok) updateFinanceUser(livreur.userUuid, username, phone, password)
+            result
         }
     }
 
@@ -213,7 +329,11 @@ class StockViewModel(application: Application) : AndroidViewModel(application) {
             onDone(false)
             return
         }
-        launch("Livreur supprimé", onDone) { repository.deleteLivreur(livreur.id) }
+        launch("Livreur supprimé", onDone) {
+            val result = repository.deleteLivreur(livreur.id)
+            if (result is StockResult.Ok) deleteFinanceUser(livreur.userUuid)
+            result
+        }
     }
 
     fun giveMiniStock(
@@ -350,11 +470,47 @@ class StockViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun ownerOrganism(): Long? {
         val current = sessionState.value
-        if (current == null || current.role != StockRole.OWNER.name) {
-            messages.tryEmit("Réservé au propriétaire de l'organisation")
+        if (current == null || !current.isOwner) {
+            messages.tryEmit("Réservé à la gestion de l'organisation")
             return null
         }
         return current.organismId
+    }
+
+    private fun updateFinanceUser(userUuid: String, username: String, phone: String, password: String) {
+        if (userUuid.isBlank()) return
+        val login = StockRules.normalizeUsername(username) ?: return
+        val app = getApplication<MCoreApplication>()
+        val existing = app.database.userDao().findByUuid(userUuid) ?: return
+        app.userRepository.update(
+            existing.copy(
+                username = login,
+                phone = phone.trim().ifBlank { null },
+                password = password.ifBlank { existing.password }
+            )
+        )
+    }
+
+    private fun deleteFinanceUser(userUuid: String) {
+        if (userUuid.isBlank()) return
+        val app = getApplication<MCoreApplication>()
+        val existing = app.database.userDao().findByUuid(userUuid) ?: return
+        app.database.userDao().delete(existing)
+        ChangeTracker(app.database.syncQueueDao()).recordDelete(SyncQueueModel.TYPE_USER, userUuid)
+    }
+
+    private suspend fun publishCloud(): String? {
+        val app = getApplication<MCoreApplication>()
+        try {
+            val session = app.sessionRepository.session.first()
+            if (session.isLoggedIn && session.organismUuid.isNotBlank()) {
+                app.syncManager.syncAll(session.organismUuid, session.username, session.role)
+            }
+        } catch (error: Exception) {
+            Log.e(TAG, "Sync comptable impossible", error)
+        }
+        val uuid = sessionState.value?.organismUuid.orEmpty()
+        return if (uuid.isBlank()) null else sync.sync(uuid)
     }
 
     private fun launch(success: String, onDone: (Boolean) -> Unit = {}, block: suspend () -> StockResult) {
@@ -363,6 +519,7 @@ class StockViewModel(application: Application) : AndroidViewModel(application) {
                 when (val result = block()) {
                     StockResult.Ok -> {
                         messages.emit(success)
+                        publishCloud()?.let { messages.emit("Enregistré ici. Cloud : $it") }
                         onDone(true)
                     }
                     is StockResult.Error -> {
@@ -375,5 +532,9 @@ class StockViewModel(application: Application) : AndroidViewModel(application) {
                 onDone(false)
             }
         }
+    }
+
+    companion object {
+        private const val TAG = "StockViewModel"
     }
 }

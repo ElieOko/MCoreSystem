@@ -16,11 +16,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -37,8 +39,12 @@ import elieoko.app.mcoresystem.presentation.ui.theme.BluePrimaryDark
 
 @Composable
 fun ModuleLauncherPage(
+    organismName: String,
+    username: String,
+    showFinance: Boolean,
     onOpenFinance: () -> Unit,
-    onOpenStock: () -> Unit
+    onOpenStock: () -> Unit,
+    onLogout: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -46,32 +52,47 @@ fun ModuleLauncherPage(
             .background(MaterialTheme.colorScheme.background)
             .statusBarsPadding()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 28.dp)
+            .padding(horizontal = 20.dp, vertical = 20.dp)
     ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = organismName.ifBlank { "MCoreSystem" },
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = if (username.isBlank()) "Choisissez un module" else "Bonjour $username",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            IconButton(onClick = onLogout) {
+                Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = "Déconnexion")
+            }
+        }
+        Spacer(Modifier.height(8.dp))
         Text(
-            text = "MCoreSystem",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onBackground
-        )
-        Spacer(Modifier.height(6.dp))
-        Text(
-            text = "Choisissez le module à ouvrir",
-            style = MaterialTheme.typography.bodyLarge,
+            text = "La connexion ouvre toute l'organisation : comptabilité et stock des livreurs.",
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        Spacer(Modifier.height(28.dp))
-        ModuleCard(
-            title = "Comptabilité",
-            description = "Opérations, catégories, rapports et paramètres. Ce module reste inchangé.",
-            icon = Icons.Default.AccountBalance,
-            gradient = listOf(BluePrimary, BluePrimaryDark),
-            onClick = onOpenFinance
-        )
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(24.dp))
+        if (showFinance) {
+            ModuleCard(
+                title = "Comptabilité",
+                description = "Opérations, catégories, rapports et paramètres.",
+                icon = Icons.Default.AccountBalance,
+                gradient = listOf(BluePrimary, BluePrimaryDark),
+                onClick = onOpenFinance
+            )
+            Spacer(Modifier.height(16.dp))
+        }
         ModuleCard(
             title = "Stock livreurs",
-            description = "Stock central et mini-stock remis à chaque livreur. Données séparées de la comptabilité.",
+            description = "Dépôt, montants, mini-stocks, commandes et historique. Les données partent vers le cloud de l'organisation.",
             icon = Icons.Default.LocalShipping,
             gradient = listOf(AccentTeal, Color(0xFF00796B)),
             onClick = onOpenStock

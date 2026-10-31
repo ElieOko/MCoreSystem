@@ -2,6 +2,7 @@ package elieoko.app.mcoresystem.stock.data
 
 import androidx.room.withTransaction
 import elieoko.app.mcoresystem.domain.util.SecurityUtil
+import elieoko.app.mcoresystem.domain.util.TimeUtil
 import elieoko.app.mcoresystem.stock.StockRules
 import kotlinx.coroutines.flow.Flow
 import java.text.SimpleDateFormat
@@ -45,7 +46,7 @@ class StockRepository(private val database: StockDatabase) {
             val createdOn = now()
             val organismUuid = UUID.randomUUID().toString()
             val organismId = dao.insertOrganism(
-                StockOrganism(uuid = organismUuid, name = orgName, createdOn = createdOn)
+                StockOrganism(uuid = organismUuid, name = orgName, createdOn = createdOn, updatedAt = iso())
             )
             dao.claimProducts(organismId)
             dao.claimLivreurs(organismId)
@@ -104,15 +105,25 @@ class StockRepository(private val database: StockDatabase) {
         )
     }
 
-    suspend fun createProduct(organismId: Long, name: String, unit: String, initialQuantity: Double): StockResult {
+    suspend fun createProduct(
+        organismId: Long,
+        name: String,
+        unit: String,
+        initialQuantity: Double,
+        unitPrice: Double
+    ): StockResult {
         val cleanName = StockRules.cleanName(name)
             ?: return StockResult.Error("Le nom de l'article est requis")
         val cleanUnit = StockRules.cleanName(unit) ?: "pièce"
         if (initialQuantity < 0.0) {
             return StockResult.Error("La quantité initiale ne peut pas être négative")
         }
+        if (unitPrice < 0.0) {
+            return StockResult.Error("Le montant ne peut pas être négatif")
+        }
         return database.withTransaction {
             val createdOn = now()
+            val stamp = iso()
             val id = dao.insertProduct(
                 StockProduct(
                     name = cleanName,
@@ -120,18 +131,19 @@ class StockRepository(private val database: StockDatabase) {
                     centralQuantity = initialQuantity,
                     createdOn = createdOn,
                     organismId = organismId,
-                    uuid = UUID.randomUUID().toString()
+                    uuid = UUID.randomUUID().toString(),
+                    unitPrice = unitPrice,
+                    updatedAt = stamp
                 )
             )
             if (initialQuantity > 0.0) {
                 dao.insertMovement(
-                    StockMovement(
-                        type = MovementType.ENTREE.name,
+                    movement(
+                        type = MovementType.ENTREE,
                         productId = id,
                         productName = cleanName,
                         quantity = initialQuantity,
                         note = "Stock initial",
-                        createdOn = createdOn,
                         organismId = organismId
                     )
                 )
@@ -140,12 +152,15 @@ class StockRepository(private val database: StockDatabase) {
         }
     }
 
-    suspend fun renameProduct(productId: Long, name: String, unit: String): StockResult {
+    suspend fun renameProduct(productId: Long, name: String, unit: String, unitPrice: Double): StockResult {
         val cleanName = StockRules.cleanName(name)
             ?: return StockResult.Error("Le nom de l'article est requis")
         val cleanUnit = StockRules.cleanName(unit) ?: "pièce"
+        if (unitPrice < 0.0) return StockResult.Error("Le montant ne peut pas être négatif")
         val product = dao.getProduct(productId) ?: return StockResult.Error("Article introuvable")
-        dao.updateProduct(product.copy(name = cleanName, unit = cleanUnit))
+        dao.updateProduct(
+            product.copy(name = cleanName, unit = cleanUnit, unitPrice = unitPrice, updatedAt = iso())
+        )
         return StockResult.Ok
     }
 
@@ -165,7 +180,12 @@ class StockRepository(private val database: StockDatabase) {
         if (quantity <= 0.0) return StockResult.Error("La quantité doit être supérieure à zéro")
         return database.withTransaction {
             val product = dao.getProduct(productId) ?: return@withTransaction StockResult.Error("Article introuvable")
-            dao.updateProduct(product.copy(centralQuantity = StockRules.add(product.centralQuantity, quantity)))
+            dao.updateProduct(
+                product.copy(
+                    centralQuantity = StockRules.add(product.centralQuantity, quantity),
+                    updatedAt = iso()
+                )
+            )
             recordCentral(product, quantity, note, MovementType.ENTREE)
             StockResult.Ok
         }
@@ -176,7 +196,12 @@ class StockRepository(private val database: StockDatabase) {
             val product = dao.getProduct(productId) ?: return@withTransaction StockResult.Error("Article introuvable")
             val error = StockRules.giveError(product.centralQuantity, quantity)
             if (error != null) return@withTransaction StockResult.Error(error)
-            dao.updateProduct(product.copy(centralQuantity = StockRules.subtract(product.centralQuantity, quantity)))
+            dao.updateProduct(
+                product.copy(
+                    centralQuantity = StockRules.subtract(product.centralQuantity, quantity),
+                    updatedAt = iso()
+                )
+            )
             recordCentral(product, quantity, note, MovementType.RETRAIT)
             StockResult.Ok
         }
@@ -187,7 +212,8 @@ class StockRepository(private val database: StockDatabase) {
         name: String,
         phone: String,
         username: String,
-        password: String
+        password: String,
+        userUuid: String
     ): StockResult {
         val cleanName = StockRules.cleanName(name)
             ?: return StockResult.Error("Le nom du livreur est requis")
@@ -205,7 +231,9 @@ class StockRepository(private val database: StockDatabase) {
                     phone = phone.trim(),
                     createdOn = createdOn,
                     organismId = organismId,
-                    uuid = UUID.randomUUID().toString()
+                    uuid = UUID.randomUUID().toString(),
+                    userUuid = userUuid,
+                    updatedAt = iso()
                 )
             )
             dao.insertAccount(
@@ -244,7 +272,7 @@ class StockRepository(private val database: StockDatabase) {
         ) {
             return StockResult.Error("Cet identifiant est déjà utilisé dans l'organisation")
         }
-        dao.updateLivreur(livreur.copy(name = cleanName, phone = phone.trim()))
+        dao.updateLivreur(livreur.copy(name = cleanName, phone = phone.trim(), updatedAt = iso()))
         dao.updateAccount(
             account.copy(
                 username = login,
@@ -274,7 +302,10 @@ class StockRepository(private val database: StockDatabase) {
             val error = StockRules.giveError(product.centralQuantity, quantity)
             if (error != null) return@withTransaction StockResult.Error(error)
             dao.updateProduct(
-                product.copy(centralQuantity = StockRules.subtract(product.centralQuantity, quantity))
+                product.copy(
+                    centralQuantity = StockRules.subtract(product.centralQuantity, quantity),
+                    updatedAt = iso()
+                )
             )
             val existing = dao.getMini(livreurId, productId)
             if (existing == null) {
@@ -283,22 +314,25 @@ class StockRepository(private val database: StockDatabase) {
                         livreurId = livreurId,
                         productId = productId,
                         quantity = quantity,
-                        organismId = product.organismId
+                        organismId = product.organismId,
+                        uuid = UUID.randomUUID().toString(),
+                        updatedAt = iso()
                     )
                 )
             } else {
-                dao.updateMini(existing.copy(quantity = StockRules.add(existing.quantity, quantity)))
+                dao.updateMini(
+                    existing.copy(quantity = StockRules.add(existing.quantity, quantity), updatedAt = iso())
+                )
             }
             dao.insertMovement(
-                StockMovement(
-                    type = MovementType.DOTATION.name,
+                movement(
+                    type = MovementType.DOTATION,
                     productId = product.id,
                     productName = product.name,
                     livreurId = livreur.id,
                     livreurName = livreur.name,
                     quantity = quantity,
-                    note = note.trim(),
-                    createdOn = now(),
+                    note = note,
                     organismId = product.organismId
                 )
             )
@@ -377,7 +411,10 @@ class StockRepository(private val database: StockDatabase) {
                 val orderLine = dao.getOrderLine(order.id, line.productId)
                 if (orderLine != null) {
                     dao.updateOrderLine(
-                        orderLine.copy(quantityDelivered = StockRules.add(orderLine.quantityDelivered, line.quantity))
+                        orderLine.copy(
+                            quantityDelivered = StockRules.add(orderLine.quantityDelivered, line.quantity),
+                            updatedAt = iso()
+                        )
                     )
                 }
             }
@@ -385,7 +422,7 @@ class StockRepository(private val database: StockDatabase) {
         if (order != null) {
             val refreshed = dao.linesForOrder(order.id)
             val status = StockRules.nextOrderStatus(refreshed.map { it.quantityOrdered to it.quantityDelivered })
-            dao.updateOrder(order.copy(status = status))
+            dao.updateOrder(order.copy(status = status, updatedAt = iso()))
         }
         return StockResult.Ok
     }
@@ -418,6 +455,7 @@ class StockRepository(private val database: StockDatabase) {
                     return@withTransaction StockResult.Error("${product.name} n'appartient pas à l'organisation")
                 }
             }
+            val stamp = iso()
             val orderId = dao.insertOrder(
                 StockOrder(
                     organismId = organismId,
@@ -425,7 +463,9 @@ class StockRepository(private val database: StockDatabase) {
                     customerName = customer,
                     status = if (livreur == null) OrderStatus.BROUILLON.name else OrderStatus.ASSIGNEE.name,
                     note = note.trim(),
-                    createdOn = now()
+                    createdOn = now(),
+                    uuid = UUID.randomUUID().toString(),
+                    updatedAt = stamp
                 )
             )
             merged.forEach { line ->
@@ -433,7 +473,9 @@ class StockRepository(private val database: StockDatabase) {
                     StockOrderLine(
                         orderId = orderId,
                         productId = line.productId,
-                        quantityOrdered = line.quantity
+                        quantityOrdered = line.quantity,
+                        uuid = UUID.randomUUID().toString(),
+                        updatedAt = stamp
                     )
                 )
             }
@@ -447,7 +489,7 @@ class StockRepository(private val database: StockDatabase) {
         if (order.status == OrderStatus.LIVREE.name) {
             return StockResult.Error("Une commande déjà livrée ne peut pas être annulée")
         }
-        dao.updateOrder(order.copy(status = OrderStatus.ANNULEE.name))
+        dao.updateOrder(order.copy(status = OrderStatus.ANNULEE.name, updatedAt = iso()))
         return StockResult.Ok
     }
 
@@ -481,20 +523,28 @@ class StockRepository(private val database: StockDatabase) {
             return StockResult.Error(error ?: "Mini-stock insuffisant (0 disponible)")
         }
         val left = StockRules.subtract(line.quantity, quantity)
-        if (StockRules.isGone(left)) dao.deleteMini(line.id) else dao.updateMini(line.copy(quantity = left))
+        if (StockRules.isGone(left)) {
+            dao.deleteMini(line.id)
+        } else {
+            dao.updateMini(line.copy(quantity = left, updatedAt = iso()))
+        }
         if (backToCentral) {
-            dao.updateProduct(product.copy(centralQuantity = StockRules.add(product.centralQuantity, quantity)))
+            dao.updateProduct(
+                product.copy(
+                    centralQuantity = StockRules.add(product.centralQuantity, quantity),
+                    updatedAt = iso()
+                )
+            )
         }
         dao.insertMovement(
-            StockMovement(
-                type = type.name,
+            movement(
+                type = type,
                 productId = product.id,
                 productName = product.name,
                 livreurId = livreur.id,
                 livreurName = livreur.name,
                 quantity = quantity,
-                note = note.trim(),
-                createdOn = now(),
+                note = note,
                 organismId = product.organismId,
                 orderId = orderId
             )
@@ -508,6 +558,43 @@ class StockRepository(private val database: StockDatabase) {
         return listOf(prefix, extra).filter { it.isNotBlank() }.joinToString(" — ")
     }
 
+    suspend fun livreurByUserUuid(userUuid: String): StockLivreur? {
+        if (userUuid.isBlank()) return null
+        return dao.livreurByUserUuid(userUuid)
+    }
+
+    /**
+     * L'organisation du stock porte le même uuid que l'organisme comptable,
+     * pour que les lignes poussées appartiennent à public.organisms.
+     */
+    suspend fun ensureOrganism(uuid: String, name: String): StockOrganism {
+        val cleanName = name.trim().ifBlank { "Organisation" }
+        val existing = dao.organismByUuid(uuid)
+        if (existing != null) {
+            if (existing.name == cleanName) return existing
+            val updated = existing.copy(name = cleanName, updatedAt = iso())
+            dao.updateOrganism(updated)
+            return updated
+        }
+        val all = dao.allOrganisms()
+        if (all.size == 1) {
+            val retargeted = all.first().copy(uuid = uuid, name = cleanName, updatedAt = iso())
+            dao.updateOrganism(retargeted)
+            return retargeted
+        }
+        val createdOn = now()
+        val id = dao.insertOrganism(
+            StockOrganism(uuid = uuid, name = cleanName, createdOn = createdOn, updatedAt = iso())
+        )
+        dao.claimProducts(id)
+        dao.claimLivreurs(id)
+        dao.claimMiniStocks(id)
+        dao.claimMovements(id)
+        dao.claimOrders(id)
+        return dao.getOrganism(id)
+            ?: StockOrganism(id = id, uuid = uuid, name = cleanName, createdOn = createdOn, updatedAt = iso())
+    }
+
     private suspend fun recordCentral(
         product: StockProduct,
         quantity: Double,
@@ -515,18 +602,44 @@ class StockRepository(private val database: StockDatabase) {
         type: MovementType
     ) {
         dao.insertMovement(
-            StockMovement(
-                type = type.name,
+            movement(
+                type = type,
                 productId = product.id,
                 productName = product.name,
                 quantity = quantity,
-                note = note.trim(),
-                createdOn = now(),
+                note = note,
                 organismId = product.organismId
             )
         )
     }
 
+    private fun movement(
+        type: MovementType,
+        productId: Long,
+        productName: String,
+        quantity: Double,
+        note: String,
+        organismId: Long,
+        livreurId: Long? = null,
+        livreurName: String? = null,
+        orderId: Long? = null
+    ) = StockMovement(
+        type = type.name,
+        productId = productId,
+        productName = productName,
+        livreurId = livreurId,
+        livreurName = livreurName,
+        quantity = quantity,
+        note = note.trim(),
+        createdOn = now(),
+        organismId = organismId,
+        orderId = orderId,
+        uuid = UUID.randomUUID().toString(),
+        updatedAt = iso()
+    )
+
     private fun now(): String =
         SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.FRANCE).format(Date())
+
+    private fun iso(): String = TimeUtil.nowIso()
 }

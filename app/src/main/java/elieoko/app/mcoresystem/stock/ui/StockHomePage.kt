@@ -64,6 +64,7 @@ fun StockHomePage(
     val today = SimpleDateFormat("yyyy-MM-dd", Locale.FRANCE).format(Date())
     val centralUnits = products.sumOf { it.centralQuantity }
     val miniUnits = lines.sumOf { it.quantity }
+    val depotValue = products.sumOf { it.centralQuantity * it.unitPrice }
     val todayCount = movements.count { it.createdOn.startsWith(today) }
 
     StockScaffold(
@@ -94,7 +95,7 @@ fun StockHomePage(
                 BalanceCard(
                     label = "Stock central",
                     amount = "${StockRules.formatQty(centralUnits)} unités",
-                    subtitle = "${products.size} article(s) • ${StockRules.formatQty(miniUnits)} en mini-stock",
+                    subtitle = "${products.size} article(s) • ${StockRules.formatQty(miniUnits)} en mini-stock • ${StockRules.formatAmount(depotValue)}",
                     gradient = listOf(AccentTeal, ColorTealDark),
                     icon = Icons.Default.Inventory2
                 )

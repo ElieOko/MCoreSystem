@@ -1,9 +1,9 @@
 <resources>
     <string name="app_name">MCoreSystem</string>
-    <string name="login_title">Connexion</string>
-    <string name="login_subtitle">Gérez vos opérations financières</string>
+    <string name="login_title">MCoreSystem</string>
+    <string name="login_subtitle">Une connexion pour la comptabilité et le stock</string>
     <string name="register_title">Inscription</string>
-    <string name="register_subtitle">Créez votre compte utilisateur</string>
+    <string name="register_subtitle">Créez l\'organisation, puis ouvrez la comptabilité ou le stock</string>
     <string name="username">Nom d\'utilisateur</string>
     <string name="password">Mot de passe</string>
     <string name="email">Email</string>

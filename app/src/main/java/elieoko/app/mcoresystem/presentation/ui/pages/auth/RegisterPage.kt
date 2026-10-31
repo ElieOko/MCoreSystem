@@ -62,7 +62,7 @@ fun RegisterPage(
             is AuthResult.Success -> {
                 viewModelGlobal?.applySession(result.session)
                 viewModelGlobal?.consumeAuthResult()
-                navC?.navigate(ScreenRoute.Home.name) {
+                navC?.navigate(ScreenRoute.afterLogin(result.session.role)) {
                     popUpTo(ScreenRoute.Login.name) { inclusive = true }
                 }
             }

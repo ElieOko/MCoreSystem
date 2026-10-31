@@ -21,6 +21,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import elieoko.app.mcoresystem.stock.StockAccess
 import elieoko.app.mcoresystem.stock.StockViewModel
 
 private object StockRoute {
@@ -40,32 +41,38 @@ private object StockRoute {
 }
 
 @Composable
-fun StockApp(onLeave: () -> Unit) {
+fun StockApp(access: StockAccess, onLeave: () -> Unit, onLogout: () -> Unit) {
     val viewModel: StockViewModel = viewModel()
     val snackbarHostState = remember { SnackbarHostState() }
     val ready by viewModel.ready.collectAsState()
     val session by viewModel.session.collectAsState()
 
+    LaunchedEffect(access) { viewModel.bind(access) }
     LaunchedEffect(viewModel) {
         viewModel.message.collect { snackbarHostState.showSnackbar(it) }
     }
 
     Box(Modifier.fillMaxSize()) {
         when {
-            !ready -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("Chargement…")
+            !ready || session == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("Chargement du stock…")
             }
-            session == null -> StockLoginPage(viewModel, onLeave)
             session?.isLivreur == true -> LivreurGraph(
                 viewModel = viewModel,
                 livreurId = session?.livreurId ?: 0L,
                 onLeave = onLeave,
-                onLogout = { viewModel.logout() }
+                onLogout = {
+                    viewModel.logout()
+                    onLogout()
+                }
             )
             else -> OwnerGraph(
                 viewModel = viewModel,
                 onLeave = onLeave,
-                onLogout = { viewModel.logout() }
+                onLogout = {
+                    viewModel.logout()
+                    onLogout()
+                }
             )
         }
         SnackbarHost(
@@ -153,6 +160,7 @@ private fun LivreurGraph(
             StockLivreurSpacePage(
                 viewModel = viewModel,
                 onLeave = onLeave,
+                showBack = false,
                 onLogout = onLogout,
                 onDeliver = { navController.navigate(StockRoute.Delivery) },
                 onHistory = { navController.navigate(StockRoute.Movements) }

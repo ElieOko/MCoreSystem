@@ -36,6 +36,7 @@ import elieoko.app.mcoresystem.stock.data.StockProduct
 fun StockLivreurSpacePage(
     viewModel: StockViewModel,
     onLeave: () -> Unit,
+    showBack: Boolean = true,
     onLogout: () -> Unit,
     onDeliver: () -> Unit,
     onHistory: () -> Unit
@@ -54,6 +55,7 @@ fun StockLivreurSpacePage(
     StockScaffold(
         title = session?.livreurName?.ifBlank { null } ?: "Mon mini-stock",
         onBack = onLeave,
+        showBack = showBack,
         floatingAction = { StockFab(Icons.Default.LocalShipping, "Livraison", onDeliver) },
         actions = {
             IconButton(onClick = onLogout) {

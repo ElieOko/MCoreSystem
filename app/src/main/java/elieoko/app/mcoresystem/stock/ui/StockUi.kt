@@ -43,6 +43,7 @@ import elieoko.app.mcoresystem.presentation.ui.theme.AccentTeal
 fun StockScaffold(
     title: String,
     onBack: () -> Unit,
+    showBack: Boolean = true,
     floatingAction: (@Composable () -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit = {},
     content: @Composable (androidx.compose.foundation.layout.PaddingValues) -> Unit
@@ -52,8 +53,10 @@ fun StockScaffold(
             TopAppBar(
                 title = { Text(title, fontWeight = FontWeight.SemiBold) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Retour")
+                    if (showBack) {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Retour")
+                        }
                     }
                 },
                 actions = actions,

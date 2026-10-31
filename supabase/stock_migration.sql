@@ -5,9 +5,9 @@
 -- déjà public.organisms (voir schema.sql).
 -- Le script est idempotent : on peut le relancer.
 --
--- Comptes du module (table stock_accounts), distincts de public.users :
---   OWNER   propriétaire de l'organisation, suit tout le stock et l'historique
---   LIVREUR ne voit que son mini-stock et enregistre les sorties de livraison
+-- Connexion : la page du module comptable (public.users, rôles ADMIN, MEMBER, LIVREUR).
+-- Le livreur est lié par stock_livreurs.user_uuid.
+-- Chaque article a un montant unitaire (stock_products.unit_price).
 --
 -- Commandes :
 --   BROUILLON | ASSIGNEE | EN_LIVRAISON | LIVREE | ANNULEE
@@ -21,6 +21,7 @@ create table if not exists public.stock_products (
     name text not null default '',
     unit text not null default 'pièce',
     central_quantity double precision not null default 0,
+    unit_price double precision not null default 0,
     updated_at timestamptz not null default now()
 );
 
@@ -29,6 +30,7 @@ create table if not exists public.stock_livreurs (
     organism_uuid uuid not null references public.organisms (uuid) on delete cascade,
     name text not null default '',
     phone text not null default '',
+    user_uuid text,
     updated_at timestamptz not null default now()
 );
 
@@ -104,3 +106,7 @@ alter table public.mini_stocks disable row level security;
 alter table public.stock_orders disable row level security;
 alter table public.stock_order_lines disable row level security;
 alter table public.stock_movements disable row level security;
+
+-- Colonnes ajoutées après la première version du module.
+alter table public.stock_products add column if not exists unit_price double precision not null default 0;
+alter table public.stock_livreurs add column if not exists user_uuid text;

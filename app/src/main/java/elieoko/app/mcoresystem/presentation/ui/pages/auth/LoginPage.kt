@@ -63,7 +63,7 @@ fun LoginPage(
             is AuthResult.Success -> {
                 viewModelGlobal?.applySession(result.session)
                 viewModelGlobal?.consumeAuthResult()
-                navC?.navigate(ScreenRoute.Home.name) {
+                navC?.navigate(ScreenRoute.afterLogin(result.session.role)) {
                     popUpTo(ScreenRoute.Login.name) { inclusive = true }
                 }
             }
@@ -122,6 +122,22 @@ fun LoginPage(
                         color = Color.White.copy(alpha = 0.85f),
                         textAlign = TextAlign.Center
                     )
+                    Space(y = 14)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf("Comptabilité", "Stock livreurs").forEach { label ->
+                            Surface(
+                                shape = RoundedCornerShape(50),
+                                color = Color.White.copy(alpha = 0.16f)
+                            ) {
+                                Text(
+                                    text = label,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                    color = Color.White,
+                                    style = MaterialTheme.typography.labelLarge
+                                )
+                            }
+                        }
+                    }
                 }
             }
             Space(y = 28)

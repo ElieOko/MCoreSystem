@@ -15,6 +15,9 @@ import elieoko.app.mcoresystem.presentation.ui.pages.auth.RegisterPage
 import elieoko.app.mcoresystem.presentation.ui.pages.category.CategoryPage
 import elieoko.app.mcoresystem.presentation.ui.pages.category.type.TypeCategoryPage
 import elieoko.app.mcoresystem.presentation.ui.pages.home.HomePage
+import elieoko.app.mcoresystem.presentation.ui.pages.launcher.ModuleLauncherPage
+import elieoko.app.mcoresystem.stock.StockAccess
+import elieoko.app.mcoresystem.stock.ui.StockApp
 import elieoko.app.mcoresystem.presentation.ui.pages.operation.OperationPage
 import elieoko.app.mcoresystem.presentation.ui.pages.operation.detail.OperationDetailPage
 import elieoko.app.mcoresystem.presentation.ui.pages.report.ReportPage
@@ -33,6 +36,44 @@ fun Navigation(
         }
         composable(ScreenRoute.Register.name) {
             RegisterPage(navC, viewModelGlobal)
+        }
+        composable(ScreenRoute.Portal.name) {
+            val role = viewModelGlobal?.currentRole?.value.orEmpty()
+            ModuleLauncherPage(
+                organismName = viewModelGlobal?.currentOrganismName?.value.orEmpty(),
+                username = viewModelGlobal?.currentUsername?.value.orEmpty(),
+                showFinance = !role.equals("LIVREUR", ignoreCase = true),
+                onOpenFinance = { navC.navigate(ScreenRoute.Home.name) },
+                onOpenStock = { navC.navigate(ScreenRoute.Stock.name) },
+                onLogout = {
+                    viewModelGlobal?.logout {
+                        navC.navigate(ScreenRoute.Login.name) {
+                            popUpTo(navC.graph.id) { inclusive = true }
+                        }
+                    }
+                }
+            )
+        }
+        composable(ScreenRoute.Stock.name) {
+            val access = StockAccess(
+                organismUuid = viewModelGlobal?.currentOrganismUuid?.value.orEmpty(),
+                organismName = viewModelGlobal?.currentOrganismName?.value.orEmpty(),
+                financeOrganismId = viewModelGlobal?.currentOrganismId?.intValue ?: 0,
+                userUuid = viewModelGlobal?.currentUserUuid?.value.orEmpty(),
+                username = viewModelGlobal?.currentUsername?.value.orEmpty(),
+                role = viewModelGlobal?.currentRole?.value.orEmpty()
+            )
+            StockApp(
+                access = access,
+                onLeave = { navC.popBackStack() },
+                onLogout = {
+                    viewModelGlobal?.logout {
+                        navC.navigate(ScreenRoute.Login.name) {
+                            popUpTo(navC.graph.id) { inclusive = true }
+                        }
+                    }
+                }
+            )
         }
         composable(ScreenRoute.Home.name) {
             HomePage(navC, viewModelGlobal)

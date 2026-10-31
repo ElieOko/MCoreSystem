@@ -73,6 +73,11 @@ fun StockProductsPage(viewModel: StockViewModel, onBack: () -> Unit) {
                             style = MaterialTheme.typography.bodyMedium
                         )
                         Text(
+                            "Montant : ${StockRules.formatAmount(product.unitPrice)} / ${product.unit} • valeur ${StockRules.formatAmount(product.centralQuantity * product.unitPrice)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
                             "Chez les livreurs : ${StockRules.formatQty(distributed)} ${product.unit}",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -100,8 +105,8 @@ fun StockProductsPage(viewModel: StockViewModel, onBack: () -> Unit) {
             unit = "pièce",
             showInitial = true,
             onDismiss = { creating = false },
-            onSave = { name, unit, initial ->
-                viewModel.createProduct(name, unit, initial) { ok -> if (ok) creating = false }
+            onSave = { name, unit, initial, price ->
+                viewModel.createProduct(name, unit, initial, price) { ok -> if (ok) creating = false }
             }
         )
     }
@@ -110,10 +115,11 @@ fun StockProductsPage(viewModel: StockViewModel, onBack: () -> Unit) {
             title = "Modifier l'article",
             name = product.name,
             unit = product.unit,
+            price = StockRules.formatAmount(product.unitPrice),
             showInitial = false,
             onDismiss = { editing = null },
-            onSave = { name, unit, _ ->
-                viewModel.renameProduct(product, name, unit) { ok -> if (ok) editing = null }
+            onSave = { name, unit, _, price ->
+                viewModel.renameProduct(product, name, unit, price) { ok -> if (ok) editing = null }
             }
         )
     }
@@ -168,12 +174,14 @@ private fun ProductFormDialog(
     title: String,
     name: String,
     unit: String,
+    price: String = "",
     showInitial: Boolean,
     onDismiss: () -> Unit,
-    onSave: (String, String, String) -> Unit
+    onSave: (String, String, String, String) -> Unit
 ) {
     var nameValue by remember { mutableStateOf(name) }
     var unitValue by remember { mutableStateOf(unit) }
+    var priceValue by remember { mutableStateOf(price) }
     var initial by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -182,13 +190,14 @@ private fun ProductFormDialog(
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 LabeledField("Nom", nameValue, { nameValue = it }, "Ex. Pain, Eau")
                 LabeledField("Unité", unitValue, { unitValue = it }, "pièce, carton, kg")
+                LabeledField("Prix unitaire", priceValue, { priceValue = it }, "0")
                 if (showInitial) {
                     LabeledField("Quantité initiale au dépôt", initial, { initial = it }, "0")
                 }
             }
         },
         confirmButton = {
-            TextButton(onClick = { onSave(nameValue, unitValue, initial) }) { Text("Enregistrer") }
+            TextButton(onClick = { onSave(nameValue, unitValue, initial, priceValue) }) { Text("Enregistrer") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Annuler") } }
     )

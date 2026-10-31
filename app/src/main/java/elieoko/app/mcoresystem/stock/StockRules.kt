@@ -19,6 +19,20 @@ object StockRules {
         return value
     }
 
+    /** Montant unitaire : vide vaut 0, un nombre négatif est refusé. */
+    fun parseAmount(raw: String): Double? {
+        if (raw.isBlank()) return 0.0
+        val normalized = raw.trim().replace(',', '.').replace(" ", "")
+        val value = normalized.toDoubleOrNull() ?: return null
+        if (value < 0.0 || value.isNaN() || value.isInfinite()) return null
+        return value
+    }
+
+    fun formatAmount(value: Double): String {
+        val rounded = round(value * 100.0) / 100.0
+        return String.format(Locale.FRANCE, "%.2f", rounded)
+    }
+
     fun formatQty(value: Double): String {
         val rounded = round(value * 100.0) / 100.0
         return if (abs(rounded - rounded.toLong()) < 0.001) {
