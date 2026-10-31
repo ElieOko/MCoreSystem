@@ -77,6 +77,11 @@ fun HomePage(navC: NavHostController? = null, viewModelGlobal: ApplicationViewMo
     val todayCount = operations.count { it.operation?.createdOn?.startsWith(dateToday) == true }
 
     val menuItems = listOf(
+        MenuItem(0, "Modules") {
+            navC?.navigate(ScreenRoute.Portal.name) {
+                popUpTo(ScreenRoute.Home.name) { inclusive = true }
+            }
+        },
         MenuItem(1, stringResource(R.string.operations)) { navC?.navigate(ScreenRoute.Operation.name) },
         MenuItem(2, stringResource(R.string.categories)) { navC?.navigate(ScreenRoute.Category.name) },
         MenuItem(3, stringResource(R.string.type_categories)) { navC?.navigate(ScreenRoute.TypeCategory.name) },
@@ -104,10 +109,11 @@ fun HomePage(navC: NavHostController? = null, viewModelGlobal: ApplicationViewMo
                 title = organismName,
                 onclick = { navC?.navigate(ScreenRoute.Setting.name) },
                 onclickLogOut = {
-                    // Déconnexion volontaire : la session persistée est effacée.
                     viewModelGlobal?.logout {
-                        navC?.navigate(ScreenRoute.Login.name) {
-                            popUpTo(ScreenRoute.Home.name) { inclusive = true }
+                        navC?.let { nav ->
+                            nav.navigate(ScreenRoute.Login.name) {
+                                popUpTo(nav.graph.id) { inclusive = true }
+                            }
                         }
                     }
                 },

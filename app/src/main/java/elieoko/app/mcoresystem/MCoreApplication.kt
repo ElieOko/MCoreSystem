@@ -11,6 +11,8 @@ import elieoko.app.mcoresystem.data.remote.SyncWorker
 import elieoko.app.mcoresystem.data.room.*
 import elieoko.app.mcoresystem.domain.repository.AuthRepository
 import elieoko.app.mcoresystem.domain.repository.room.*
+import elieoko.app.mcoresystem.stock.data.StockDatabase
+import elieoko.app.mcoresystem.stock.data.StockSync
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
 
@@ -49,6 +51,8 @@ class MCoreApplication : Application() {
                 val session = sessionRepository.session.first()
                 if (session.isLoggedIn && session.organismUuid.isNotBlank()) {
                     syncManager.syncAll(session.organismUuid, session.username, session.role)
+                    // Le stock part après la comptabilité : l'organisme doit déjà exister côté cloud.
+                    runCatching { StockSync(StockDatabase.get(this@MCoreApplication)).sync(session.organismUuid) }
                 }
             } catch (_: Exception) {
                 // La synchronisation réessaiera au prochain déclencheur.

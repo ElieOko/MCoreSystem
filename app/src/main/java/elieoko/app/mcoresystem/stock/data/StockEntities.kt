@@ -21,7 +21,11 @@ data class StockProduct(
     @ColumnInfo(name = "organism_id", defaultValue = "0")
     val organismId: Long = 0,
     @ColumnInfo(name = "uuid", defaultValue = "")
-    val uuid: String = ""
+    val uuid: String = "",
+    @ColumnInfo(name = "unit_price", defaultValue = "0")
+    val unitPrice: Double = 0.0,
+    @ColumnInfo(name = "updated_at", defaultValue = "")
+    val updatedAt: String = ""
 )
 
 @Entity(tableName = "stock_livreur")
@@ -38,7 +42,11 @@ data class StockLivreur(
     @ColumnInfo(name = "organism_id", defaultValue = "0")
     val organismId: Long = 0,
     @ColumnInfo(name = "uuid", defaultValue = "")
-    val uuid: String = ""
+    val uuid: String = "",
+    @ColumnInfo(name = "user_uuid", defaultValue = "")
+    val userUuid: String = "",
+    @ColumnInfo(name = "updated_at", defaultValue = "")
+    val updatedAt: String = ""
 )
 
 @Entity(
@@ -56,7 +64,11 @@ data class MiniStockLine(
     @ColumnInfo(name = "quantity")
     val quantity: Double,
     @ColumnInfo(name = "organism_id", defaultValue = "0")
-    val organismId: Long = 0
+    val organismId: Long = 0,
+    @ColumnInfo(name = "uuid", defaultValue = "")
+    val uuid: String = "",
+    @ColumnInfo(name = "updated_at", defaultValue = "")
+    val updatedAt: String = ""
 )
 
 enum class MovementType(val label: String) {
@@ -95,7 +107,11 @@ data class StockMovement(
     @ColumnInfo(name = "organism_id", defaultValue = "0")
     val organismId: Long = 0,
     @ColumnInfo(name = "order_id")
-    val orderId: Long? = null
+    val orderId: Long? = null,
+    @ColumnInfo(name = "uuid", defaultValue = "")
+    val uuid: String = "",
+    @ColumnInfo(name = "updated_at", defaultValue = "")
+    val updatedAt: String = ""
 )
 
 enum class StockRole { OWNER, LIVREUR }
@@ -122,7 +138,9 @@ data class StockOrganism(
     @ColumnInfo(name = "name")
     val name: String,
     @ColumnInfo(name = "created_on")
-    val createdOn: String
+    val createdOn: String,
+    @ColumnInfo(name = "updated_at", defaultValue = "")
+    val updatedAt: String = ""
 )
 
 @Entity(tableName = "stock_account")
@@ -160,7 +178,11 @@ data class StockOrder(
     @ColumnInfo(name = "note")
     val note: String = "",
     @ColumnInfo(name = "created_on")
-    val createdOn: String
+    val createdOn: String,
+    @ColumnInfo(name = "uuid", defaultValue = "")
+    val uuid: String = "",
+    @ColumnInfo(name = "updated_at", defaultValue = "")
+    val updatedAt: String = ""
 )
 
 @Entity(tableName = "stock_order_line")
@@ -175,7 +197,11 @@ data class StockOrderLine(
     @ColumnInfo(name = "quantity_ordered")
     val quantityOrdered: Double,
     @ColumnInfo(name = "quantity_delivered")
-    val quantityDelivered: Double = 0.0
+    val quantityDelivered: Double = 0.0,
+    @ColumnInfo(name = "uuid", defaultValue = "")
+    val uuid: String = "",
+    @ColumnInfo(name = "updated_at", defaultValue = "")
+    val updatedAt: String = ""
 )
 
 data class DeliveryLine(

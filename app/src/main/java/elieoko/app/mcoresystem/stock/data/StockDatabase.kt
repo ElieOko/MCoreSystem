@@ -21,7 +21,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         StockOrder::class,
         StockOrderLine::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class StockDatabase : RoomDatabase() {
@@ -37,7 +37,7 @@ abstract class StockDatabase : RoomDatabase() {
                     context.applicationContext,
                     StockDatabase::class.java,
                     "StockLivreurDatabase.db"
-                ).addMigrations(MIGRATION_1_2).build().also { instance = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build().also { instance = it }
             }
         }
     }
@@ -68,5 +68,23 @@ val MIGRATION_1_2 = object : Migration(1, 2) {
         db.execSQL(
             "CREATE TABLE IF NOT EXISTS `stock_order_line` (`line_id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `order_id` INTEGER NOT NULL, `product_id` INTEGER NOT NULL, `quantity_ordered` REAL NOT NULL, `quantity_delivered` REAL NOT NULL)"
         )
+    }
+}
+
+val MIGRATION_2_3 = object : Migration(2, 3) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE `stock_product` ADD COLUMN `unit_price` REAL NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE `stock_product` ADD COLUMN `updated_at` TEXT NOT NULL DEFAULT ''")
+        db.execSQL("ALTER TABLE `stock_livreur` ADD COLUMN `user_uuid` TEXT NOT NULL DEFAULT ''")
+        db.execSQL("ALTER TABLE `stock_livreur` ADD COLUMN `updated_at` TEXT NOT NULL DEFAULT ''")
+        db.execSQL("ALTER TABLE `mini_stock` ADD COLUMN `uuid` TEXT NOT NULL DEFAULT ''")
+        db.execSQL("ALTER TABLE `mini_stock` ADD COLUMN `updated_at` TEXT NOT NULL DEFAULT ''")
+        db.execSQL("ALTER TABLE `stock_movement` ADD COLUMN `uuid` TEXT NOT NULL DEFAULT ''")
+        db.execSQL("ALTER TABLE `stock_movement` ADD COLUMN `updated_at` TEXT NOT NULL DEFAULT ''")
+        db.execSQL("ALTER TABLE `stock_organism` ADD COLUMN `updated_at` TEXT NOT NULL DEFAULT ''")
+        db.execSQL("ALTER TABLE `stock_order` ADD COLUMN `uuid` TEXT NOT NULL DEFAULT ''")
+        db.execSQL("ALTER TABLE `stock_order` ADD COLUMN `updated_at` TEXT NOT NULL DEFAULT ''")
+        db.execSQL("ALTER TABLE `stock_order_line` ADD COLUMN `uuid` TEXT NOT NULL DEFAULT ''")
+        db.execSQL("ALTER TABLE `stock_order_line` ADD COLUMN `updated_at` TEXT NOT NULL DEFAULT ''")
     }
 }

@@ -68,6 +68,9 @@ interface StockDao {
     @Insert
     suspend fun insertMovement(movement: StockMovement)
 
+    @Update
+    suspend fun updateMovement(movement: StockMovement)
+
     @Query("SELECT COUNT(*) FROM stock_account")
     fun observeAccountCount(): Flow<Int>
 
@@ -82,6 +85,54 @@ interface StockDao {
 
     @Query("SELECT * FROM stock_organism WHERE organism_id = :id")
     suspend fun getOrganism(id: Long): StockOrganism?
+
+    @Query("SELECT * FROM stock_organism")
+    suspend fun allOrganisms(): List<StockOrganism>
+
+    @Query("SELECT * FROM stock_organism WHERE uuid = :uuid LIMIT 1")
+    suspend fun organismByUuid(uuid: String): StockOrganism?
+
+    @Update
+    suspend fun updateOrganism(organism: StockOrganism)
+
+    @Query("SELECT * FROM stock_product WHERE organism_id = :organismId")
+    suspend fun productsOf(organismId: Long): List<StockProduct>
+
+    @Query("SELECT * FROM stock_livreur WHERE organism_id = :organismId")
+    suspend fun livreursOf(organismId: Long): List<StockLivreur>
+
+    @Query("SELECT * FROM stock_livreur WHERE user_uuid = :userUuid LIMIT 1")
+    suspend fun livreurByUserUuid(userUuid: String): StockLivreur?
+
+    @Query("SELECT * FROM mini_stock WHERE organism_id = :organismId")
+    suspend fun minisOf(organismId: Long): List<MiniStockLine>
+
+    @Query("SELECT * FROM stock_movement WHERE organism_id = :organismId")
+    suspend fun movementsOf(organismId: Long): List<StockMovement>
+
+    @Query("SELECT * FROM stock_order WHERE organism_id = :organismId")
+    suspend fun ordersOf(organismId: Long): List<StockOrder>
+
+    @Query("SELECT * FROM stock_order_line WHERE order_id = :orderId")
+    suspend fun linesOf(orderId: Long): List<StockOrderLine>
+
+    @Query("SELECT * FROM stock_product WHERE uuid = :uuid LIMIT 1")
+    suspend fun productByUuid(uuid: String): StockProduct?
+
+    @Query("SELECT * FROM stock_livreur WHERE uuid = :uuid LIMIT 1")
+    suspend fun livreurByUuid(uuid: String): StockLivreur?
+
+    @Query("SELECT * FROM mini_stock WHERE uuid = :uuid LIMIT 1")
+    suspend fun miniByUuid(uuid: String): MiniStockLine?
+
+    @Query("SELECT * FROM stock_movement WHERE uuid = :uuid LIMIT 1")
+    suspend fun movementByUuid(uuid: String): StockMovement?
+
+    @Query("SELECT * FROM stock_order WHERE uuid = :uuid LIMIT 1")
+    suspend fun orderByUuid(uuid: String): StockOrder?
+
+    @Query("SELECT * FROM stock_order_line WHERE uuid = :uuid LIMIT 1")
+    suspend fun orderLineByUuid(uuid: String): StockOrderLine?
 
     @Insert
     suspend fun insertOrganism(organism: StockOrganism): Long
@@ -109,6 +160,9 @@ interface StockDao {
 
     @Query("UPDATE stock_movement SET organism_id = :organismId WHERE organism_id = 0")
     suspend fun claimMovements(organismId: Long)
+
+    @Query("UPDATE stock_order SET organism_id = :organismId WHERE organism_id = 0")
+    suspend fun claimOrders(organismId: Long)
 
     @Query("SELECT COUNT(*) FROM stock_account WHERE organism_id = :organismId AND lower(username) = lower(:username)")
     suspend fun usernameTaken(organismId: Long, username: String): Int

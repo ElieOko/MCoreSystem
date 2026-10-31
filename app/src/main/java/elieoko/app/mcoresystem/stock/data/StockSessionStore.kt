@@ -21,8 +21,8 @@ data class StockSession(
     val livreurId: Long = 0,
     val livreurName: String = ""
 ) {
-    val isOwner: Boolean get() = role == StockRole.OWNER.name
-    val isLivreur: Boolean get() = role == StockRole.LIVREUR.name
+    val isLivreur: Boolean get() = role == StockRole.LIVREUR.name || role == "LIVREUR"
+    val isOwner: Boolean get() = role.isNotBlank() && !isLivreur
 }
 
 class StockSessionStore(private val context: Context) {

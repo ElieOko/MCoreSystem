@@ -6,6 +6,15 @@ import org.junit.Test
 
 class StockRulesTest {
     @Test
+    fun parseAmountAllowsZeroAndRejectsNegative() {
+        assertEquals(0.0, StockRules.parseAmount("")!!, 0.0)
+        assertEquals(0.0, StockRules.parseAmount("0")!!, 0.0)
+        assertEquals(12.5, StockRules.parseAmount("12,5")!!, 0.0001)
+        assertNull(StockRules.parseAmount("-1"))
+        assertNull(StockRules.parseAmount("abc"))
+    }
+
+    @Test
     fun parseQuantityAcceptsCommaAndDot() {
         assertEquals(2.5, StockRules.parseQuantity("2,5")!!, 0.0001)
         assertEquals(10.0, StockRules.parseQuantity("10")!!, 0.0001)

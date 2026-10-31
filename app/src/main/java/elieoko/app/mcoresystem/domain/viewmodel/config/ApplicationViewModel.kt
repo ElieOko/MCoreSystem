@@ -48,6 +48,9 @@ class ApplicationViewModel(
     var currentUsername = mutableStateOf("Utilisateur")
     var currentOrganismId = mutableIntStateOf(1)
     var currentOrganismName = mutableStateOf("")
+    var currentOrganismUuid = mutableStateOf("")
+    var currentUserUuid = mutableStateOf("")
+    var currentRole = mutableStateOf("MEMBER")
 
     private val _usdToCdfRate = MutableStateFlow(ExchangeRateRepository.DEFAULT_RATE)
     val usdToCdfRate = _usdToCdfRate.asStateFlow()
@@ -81,6 +84,9 @@ class ApplicationViewModel(
         currentUsername.value = session.username.ifBlank { "Utilisateur" }
         currentOrganismId.intValue = session.organismId
         currentOrganismName.value = session.organismName
+        currentOrganismUuid.value = session.organismUuid
+        currentUserUuid.value = session.userUuid
+        currentRole.value = session.role.ifBlank { "MEMBER" }
     }
 
     fun setUsdToCdfRate(rate: Double) {

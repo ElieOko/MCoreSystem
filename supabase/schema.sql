@@ -49,7 +49,7 @@ create table if not exists public.users (
     username text not null default '',
     email text,
     phone text,
-    role text not null default 'MEMBER', -- ADMIN | MEMBER
+    role text not null default 'MEMBER', -- ADMIN | MEMBER | LIVREUR
     password_hash text,                  -- SHA-256, jamais le mot de passe en clair
     updated_at timestamptz not null default now()
 );
@@ -139,6 +139,7 @@ create table if not exists public.stock_products (
     name text not null default '',
     unit text not null default 'pièce',
     central_quantity double precision not null default 0,
+    unit_price double precision not null default 0,
     updated_at timestamptz not null default now()
 );
 
@@ -147,6 +148,7 @@ create table if not exists public.stock_livreurs (
     organism_uuid uuid not null references public.organisms (uuid) on delete cascade,
     name text not null default '',
     phone text not null default '',
+    user_uuid text,
     updated_at timestamptz not null default now()
 );
 
@@ -222,3 +224,6 @@ alter table public.mini_stocks disable row level security;
 alter table public.stock_orders disable row level security;
 alter table public.stock_order_lines disable row level security;
 alter table public.stock_movements disable row level security;
+
+alter table public.stock_products add column if not exists unit_price double precision not null default 0;
+alter table public.stock_livreurs add column if not exists user_uuid text;
