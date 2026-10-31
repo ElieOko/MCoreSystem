@@ -22,8 +22,10 @@ import elieoko.app.mcoresystem.stock.data.StockResult
 import elieoko.app.mcoresystem.stock.data.StockSession
 import elieoko.app.mcoresystem.stock.data.StockSessionStore
 import elieoko.app.mcoresystem.stock.data.StockSync
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asSharedFlow
@@ -278,37 +280,15 @@ class StockViewModel(application: Application) : AndroidViewModel(application) {
         launch("Livreur enregistré dans les utilisateurs de l'organisation.", onDone) {
             val current = sessionState.value
                 ?: return@launch StockResult.Error("Organisation introuvable")
-            val app = getApplication<MCoreApplication>()
-            val finance = app.database.organismDao().findByUuid(current.organismUuid)
-                ?: return@launch StockResult.Error("Organisation introuvable. Reconnectez-vous.")
-            val users = app.database.userDao()
-            if (users.findByUsername(login) != null) {
-                return@launch StockResult.Error("Cet identifiant est déjà utilisé")
-            }
-            val userUuid = UUID.randomUUID().toString()
-            var nextId = users.countUsers() + 1
-            while (users.loadAllById(nextId).isNotEmpty()) nextId++
-            app.userRepository.insert(
-                UserModel(
-                    id = nextId,
-                    username = login,
-                    phone = phone.trim().ifBlank { null },
-                    email = null,
-                    password = password,
-                    organismId = finance.id,
-                    role = AuthRepository.ROLE_LIVREUR,
-                    uuid = userUuid
-                )
-            )
-            financeOrganismId = finance.id
-            val result = repository.createLivreur(organism, name, phone, username, password, userUuid)
-            if (result is StockResult.Error) {
-                users.findByUuid(userUuid)?.let { created ->
-                    users.delete(created)
-                    ChangeTracker(app.database.syncQueueDao()).recordDelete(SyncQueueModel.TYPE_USER, userUuid)
+            when (val prepared = insertLivreurAccount(current.organismUuid, login, phone, password)) {
+                is AccountDraft.Rejected -> StockResult.Error(prepared.message)
+                is AccountDraft.Ready -> {
+                    financeOrganismId = prepared.financeOrganismId
+                    val result = repository.createLivreur(organism, name, phone, username, password, prepared.userUuid)
+                    if (result is StockResult.Error) removeLivreurAccount(prepared.userUuid)
+                    result
                 }
             }
-            result
         }
     }
 
@@ -484,26 +464,72 @@ class StockViewModel(application: Application) : AndroidViewModel(application) {
         return current.organismId
     }
 
-    private fun updateFinanceUser(userUuid: String, username: String, phone: String, password: String) {
+    private suspend fun updateFinanceUser(userUuid: String, username: String, phone: String, password: String) {
         if (userUuid.isBlank()) return
         val login = StockRules.normalizeUsername(username) ?: return
-        val app = getApplication<MCoreApplication>()
-        val existing = app.database.userDao().findByUuid(userUuid) ?: return
-        app.userRepository.update(
-            existing.copy(
-                username = login,
-                phone = phone.trim().ifBlank { null },
-                password = password.ifBlank { existing.password }
+        withContext(Dispatchers.IO) {
+            val app = getApplication<MCoreApplication>()
+            val existing = app.database.userDao().findByUuid(userUuid) ?: return@withContext
+            app.userRepository.update(
+                existing.copy(
+                    username = login,
+                    phone = phone.trim().ifBlank { null },
+                    password = password.ifBlank { existing.password }
+                )
             )
-        )
+        }
     }
 
-    private fun deleteFinanceUser(userUuid: String) {
+    private suspend fun deleteFinanceUser(userUuid: String) {
         if (userUuid.isBlank()) return
+        withContext(Dispatchers.IO) {
+            val app = getApplication<MCoreApplication>()
+            val existing = app.database.userDao().findByUuid(userUuid) ?: return@withContext
+            app.database.userDao().delete(existing)
+            ChangeTracker(app.database.syncQueueDao()).recordDelete(SyncQueueModel.TYPE_USER, userUuid)
+        }
+    }
+
+    private suspend fun insertLivreurAccount(
+        organismUuid: String,
+        login: String,
+        phone: String,
+        password: String
+    ): AccountDraft = withContext(Dispatchers.IO) {
         val app = getApplication<MCoreApplication>()
-        val existing = app.database.userDao().findByUuid(userUuid) ?: return
-        app.database.userDao().delete(existing)
-        ChangeTracker(app.database.syncQueueDao()).recordDelete(SyncQueueModel.TYPE_USER, userUuid)
+        val finance = app.database.organismDao().findByUuid(organismUuid)
+            ?: return@withContext AccountDraft.Rejected("Organisation introuvable. Reconnectez-vous.")
+        val users = app.database.userDao()
+        if (users.findByUsername(login) != null) {
+            return@withContext AccountDraft.Rejected("Cet identifiant est déjà utilisé")
+        }
+        val userUuid = UUID.randomUUID().toString()
+        var nextId = users.countUsers() + 1
+        while (users.loadAllById(nextId).isNotEmpty()) nextId++
+        app.userRepository.insert(
+            UserModel(
+                id = nextId,
+                username = login,
+                phone = phone.trim().ifBlank { null },
+                email = null,
+                password = password,
+                organismId = finance.id,
+                role = AuthRepository.ROLE_LIVREUR,
+                uuid = userUuid
+            )
+        )
+        AccountDraft.Ready(finance.id, userUuid)
+    }
+
+    private suspend fun removeLivreurAccount(userUuid: String) {
+        withContext(Dispatchers.IO) {
+            val app = getApplication<MCoreApplication>()
+            val users = app.database.userDao()
+            users.findByUuid(userUuid)?.let { created ->
+                users.delete(created)
+                ChangeTracker(app.database.syncQueueDao()).recordDelete(SyncQueueModel.TYPE_USER, userUuid)
+            }
+        }
     }
 
     private suspend fun publishCloud(): String? {
@@ -523,17 +549,19 @@ class StockViewModel(application: Application) : AndroidViewModel(application) {
 
     private suspend fun cacheLivreursFromUsers() {
         val current = sessionState.value ?: return
-        val app = getApplication<MCoreApplication>()
-        val finance = app.database.organismDao().findByUuid(current.organismUuid) ?: return
-        financeOrganismId = finance.id
-        val profiles = app.database.userDao().findLivreurs(finance.id).map { user ->
-            LivreurProfile(
-                userUuid = user.uuid,
-                name = user.username,
-                phone = user.phone.orEmpty()
-            )
-        }
-        repository.ensureLivreurProfiles(current.organismId, profiles)
+        val loaded = withContext(Dispatchers.IO) {
+            val app = getApplication<MCoreApplication>()
+            val finance = app.database.organismDao().findByUuid(current.organismUuid) ?: return@withContext null
+            finance.id to app.database.userDao().findLivreurs(finance.id).map { user ->
+                LivreurProfile(
+                    userUuid = user.uuid,
+                    name = user.username,
+                    phone = user.phone.orEmpty()
+                )
+            }
+        } ?: return
+        financeOrganismId = loaded.first
+        repository.ensureLivreurProfiles(current.organismId, loaded.second)
     }
 
     private fun launch(success: String, onDone: (Boolean) -> Unit = {}, block: suspend () -> StockResult) {
@@ -560,4 +588,9 @@ class StockViewModel(application: Application) : AndroidViewModel(application) {
     companion object {
         private const val TAG = "StockViewModel"
     }
+}
+
+private sealed class AccountDraft {
+    data class Ready(val financeOrganismId: Int, val userUuid: String) : AccountDraft()
+    data class Rejected(val message: String) : AccountDraft()
 }

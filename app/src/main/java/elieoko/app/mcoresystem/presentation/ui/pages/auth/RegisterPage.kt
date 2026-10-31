@@ -83,11 +83,13 @@ fun RegisterPage(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
+                .statusBarsPadding()
+                .navigationBarsPadding()
                 .imePadding()
-                .padding(24.dp),
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 24.dp, vertical = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            verticalArrangement = Arrangement.spacedBy(0.dp, Alignment.CenterVertically)
         ) {
             AnimatedVisibility(
                 visible = visible,
