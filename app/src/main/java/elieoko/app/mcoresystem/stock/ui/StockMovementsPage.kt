@@ -32,18 +32,28 @@ import elieoko.app.mcoresystem.stock.StockViewModel
 import elieoko.app.mcoresystem.stock.data.MovementType
 
 @Composable
-fun StockMovementsPage(viewModel: StockViewModel, onBack: () -> Unit) {
+fun StockMovementsPage(
+    viewModel: StockViewModel,
+    onlyCurrentLivreur: Boolean = false,
+    onBack: () -> Unit
+) {
     val movements by viewModel.movements.collectAsState()
+    val session by viewModel.session.collectAsState()
+    val visible = if (onlyCurrentLivreur) {
+        movements.filter { it.livreurId == session?.livreurId }
+    } else {
+        movements
+    }
     StockScaffold(title = "Mouvements", onBack = onBack) { padding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding),
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            if (movements.isEmpty()) {
+            if (visible.isEmpty()) {
                 item { EmptyHint("Les entrées, dons de mini-stock, retours et sorties apparaîtront ici.") }
             }
-            items(movements, key = { it.id }) { movement ->
+            items(visible, key = { it.id }) { movement ->
                 val type = MovementType.from(movement.type)
                 Card(
                     shape = RoundedCornerShape(18.dp),
@@ -64,6 +74,13 @@ fun StockMovementsPage(viewModel: StockViewModel, onBack: () -> Unit) {
                                 (movement.livreurName?.let { " • $it" } ?: ""),
                             style = MaterialTheme.typography.bodyMedium
                         )
+                        if (movement.orderId != null) {
+                            Text(
+                                "Lié à la commande n°${movement.orderId}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
                         if (movement.note.isNotBlank()) {
                             Text(movement.note, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }

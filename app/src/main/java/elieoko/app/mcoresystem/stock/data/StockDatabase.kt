@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 
 /**
  * Base locale du module stock, distincte de la base comptable.
@@ -13,9 +15,13 @@ import androidx.room.RoomDatabase
         StockProduct::class,
         StockLivreur::class,
         MiniStockLine::class,
-        StockMovement::class
+        StockMovement::class,
+        StockOrganism::class,
+        StockAccount::class,
+        StockOrder::class,
+        StockOrderLine::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class StockDatabase : RoomDatabase() {
@@ -27,12 +33,40 @@ abstract class StockDatabase : RoomDatabase() {
 
         fun get(context: Context): StockDatabase {
             return instance ?: synchronized(this) {
-                instance ?: Room.databaseBuilder(
+                instance ?:                 Room.databaseBuilder(
                     context.applicationContext,
                     StockDatabase::class.java,
                     "StockLivreurDatabase.db"
-                ).build().also { instance = it }
+                ).addMigrations(MIGRATION_1_2).build().also { instance = it }
             }
         }
+    }
+}
+
+/**
+ * Conserve les articles déjà saisis et ajoute l'organisation, les comptes,
+ * les commandes et le lien mouvement → commande.
+ */
+val MIGRATION_1_2 = object : Migration(1, 2) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE `stock_product` ADD COLUMN `organism_id` INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE `stock_product` ADD COLUMN `uuid` TEXT NOT NULL DEFAULT ''")
+        db.execSQL("ALTER TABLE `stock_livreur` ADD COLUMN `organism_id` INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE `stock_livreur` ADD COLUMN `uuid` TEXT NOT NULL DEFAULT ''")
+        db.execSQL("ALTER TABLE `mini_stock` ADD COLUMN `organism_id` INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE `stock_movement` ADD COLUMN `organism_id` INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE `stock_movement` ADD COLUMN `order_id` INTEGER")
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `stock_organism` (`organism_id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `uuid` TEXT NOT NULL, `name` TEXT NOT NULL, `created_on` TEXT NOT NULL)"
+        )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `stock_account` (`account_id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `organism_id` INTEGER NOT NULL, `livreur_id` INTEGER, `username` TEXT NOT NULL, `password_hash` TEXT NOT NULL, `role` TEXT NOT NULL, `created_on` TEXT NOT NULL)"
+        )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `stock_order` (`order_id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `organism_id` INTEGER NOT NULL, `livreur_id` INTEGER, `customer_name` TEXT NOT NULL, `status` TEXT NOT NULL, `note` TEXT NOT NULL, `created_on` TEXT NOT NULL)"
+        )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `stock_order_line` (`line_id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `order_id` INTEGER NOT NULL, `product_id` INTEGER NOT NULL, `quantity_ordered` REAL NOT NULL, `quantity_delivered` REAL NOT NULL)"
+        )
     }
 }

@@ -57,4 +57,25 @@ object StockRules {
     fun add(current: Double, incoming: Double): Double = current + incoming
 
     fun isGone(quantity: Double): Boolean = quantity <= EPSILON
+
+    fun normalizeUsername(raw: String): String? {
+        val value = raw.trim()
+        if (value.length < 3 || value.any { it.isWhitespace() }) return null
+        return value
+    }
+
+    fun passwordError(raw: String): String? {
+        if (raw.length < 4) return "Le mot de passe doit contenir au moins 4 caractères"
+        return null
+    }
+
+    /**
+     * Après une livraison : la commande est livrée quand chaque ligne
+     * commandée a été au moins couverte par les sorties.
+     */
+    fun nextOrderStatus(orderedAndDelivered: List<Pair<Double, Double>>): String {
+        val complete = orderedAndDelivered.isNotEmpty() &&
+            orderedAndDelivered.all { (ordered, delivered) -> delivered + EPSILON >= ordered }
+        return if (complete) "LIVREE" else "EN_LIVRAISON"
+    }
 }
