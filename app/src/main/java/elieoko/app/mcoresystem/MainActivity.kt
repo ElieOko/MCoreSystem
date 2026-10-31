@@ -13,6 +13,10 @@ import androidx.annotation.RequiresApi
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.core.content.ContextCompat
@@ -21,6 +25,8 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import elieoko.app.mcoresystem.domain.route.Navigation
 import elieoko.app.mcoresystem.domain.route.ScreenRoute
+import elieoko.app.mcoresystem.presentation.ui.pages.launcher.ModuleLauncherPage
+import elieoko.app.mcoresystem.stock.ui.StockApp
 import elieoko.app.mcoresystem.domain.viewmodel.config.*
 import elieoko.app.mcoresystem.domain.viewmodel.room.*
 import elieoko.app.mcoresystem.presentation.ui.theme.*
@@ -70,35 +76,47 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            navHostController = rememberNavController()
             MCoreSystemTheme {
-                val applicationViewModel = viewModel<ApplicationViewModel>{
-                    ApplicationViewModel(
-                        roomVm = InstanceRoomViewModel(
-                            currencyViewModel = currencyViewModel,
-                            userViewModel = userViewModel,
-                            paymentMethodViewModel = paymentMethodViewModel,
-                            organismViewModel = organismViewModel,
-                            operationViewModel = operationViewModel,
-                            categoryViewModel = categoryViewModel,
-                            typeCategoryViewModel = typeCategoryViewModel
-                        ),
-                        exchangeRateRepository = app.exchangeRateRepository,
-                        sessionRepository = app.sessionRepository,
-                        authRepository = app.authRepository,
-                        syncManager = app.syncManager,
-                        onRequestSync = { app.triggerSync() }
+                // Le choix de module s'affiche à chaque ouverture. La comptabilité
+                // garde son parcours, ses écrans et sa base tels quels.
+                var openedModule by rememberSaveable { mutableStateOf<String?>(null) }
+                when (openedModule) {
+                    null -> ModuleLauncherPage(
+                        onOpenFinance = { openedModule = "finance" },
+                        onOpenStock = { openedModule = "stock" }
                     )
-                }
-                applicationViewModel.room.currency = currencyViewModel
-                applicationViewModel.room.user = userViewModel
-                applicationViewModel.room.paymentMethod = paymentMethodViewModel
-                applicationViewModel.room.operation = operationViewModel
-                applicationViewModel.room.category = categoryViewModel
-                applicationViewModel.room.typeCategory = typeCategoryViewModel
-                applicationViewModel.room.organism = organismViewModel
-                Scaffold(modifier = Modifier.fillMaxSize()) {
-                    Navigation(navHostController, applicationViewModel, startDestination)
+                    "stock" -> StockApp(onLeave = { openedModule = null })
+                    else -> {
+                        navHostController = rememberNavController()
+                        val applicationViewModel = viewModel<ApplicationViewModel> {
+                            ApplicationViewModel(
+                                roomVm = InstanceRoomViewModel(
+                                    currencyViewModel = currencyViewModel,
+                                    userViewModel = userViewModel,
+                                    paymentMethodViewModel = paymentMethodViewModel,
+                                    organismViewModel = organismViewModel,
+                                    operationViewModel = operationViewModel,
+                                    categoryViewModel = categoryViewModel,
+                                    typeCategoryViewModel = typeCategoryViewModel
+                                ),
+                                exchangeRateRepository = app.exchangeRateRepository,
+                                sessionRepository = app.sessionRepository,
+                                authRepository = app.authRepository,
+                                syncManager = app.syncManager,
+                                onRequestSync = { app.triggerSync() }
+                            )
+                        }
+                        applicationViewModel.room.currency = currencyViewModel
+                        applicationViewModel.room.user = userViewModel
+                        applicationViewModel.room.paymentMethod = paymentMethodViewModel
+                        applicationViewModel.room.operation = operationViewModel
+                        applicationViewModel.room.category = categoryViewModel
+                        applicationViewModel.room.typeCategory = typeCategoryViewModel
+                        applicationViewModel.room.organism = organismViewModel
+                        Scaffold(modifier = Modifier.fillMaxSize()) {
+                            Navigation(navHostController, applicationViewModel, startDestination)
+                        }
+                    }
                 }
             }
         }
