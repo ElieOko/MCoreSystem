@@ -15,8 +15,8 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -44,6 +44,10 @@ fun StockLivreurDetailPage(
     val lines by viewModel.miniStocks.collectAsState()
     val livreur = livreurs.firstOrNull { it.id == livreurId }
     val held = lines.filter { it.livreurId == livreurId && it.quantity > StockRules.EPSILON }
+    val heldValue = held.sumOf { line ->
+        val price = products.firstOrNull { it.id == line.productId }?.unitPrice ?: 0.0
+        line.quantity * price
+    }
     var pending by remember { mutableStateOf<Pair<StockProduct, MiniAction>?>(null) }
 
     StockScaffold(
@@ -57,10 +61,11 @@ fun StockLivreurDetailPage(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             item {
-                Text(
-                    text = livreur?.phone?.takeIf { it.isNotBlank() } ?: "Mini-stock actuellement détenu",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                InfoCard(
+                    title = livreur?.phone?.takeIf { it.isNotBlank() } ?: "Mini-stock détenu",
+                    value = "${StockRules.formatQty(held.sumOf { it.quantity })} unités",
+                    subtitle = "${held.size} article(s) • ${StockRules.formatAmount(heldValue)}",
+                    onClick = onGiveMore
                 )
             }
             if (held.isEmpty()) {
@@ -84,13 +89,22 @@ fun StockLivreurDetailPage(
                             style = MaterialTheme.typography.bodyLarge,
                             modifier = Modifier.padding(top = 4.dp)
                         )
-                        Row {
-                            TextButton(onClick = {
-                                product?.let { pending = it to MiniAction.RETOUR }
-                            }) { Text("Retour dépôt") }
-                            TextButton(onClick = {
-                                product?.let { pending = it to MiniAction.SORTIE }
-                            }) { Text("Sortie") }
+                        val price = product?.unitPrice ?: 0.0
+                        Text(
+                            "${StockRules.formatAmount(price)} / ${product?.unit ?: "unité"} • valeur ${StockRules.formatAmount(line.quantity * price)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Row(
+                            modifier = Modifier.padding(top = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedButton(onClick = { product?.let { pending = it to MiniAction.RETOUR } }) {
+                                Text("Retour dépôt")
+                            }
+                            OutlinedButton(onClick = { product?.let { pending = it to MiniAction.SORTIE } }) {
+                                Text("Sortie")
+                            }
                         }
                     }
                 }

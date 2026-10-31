@@ -14,7 +14,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -30,6 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.collectAsState
 import elieoko.app.mcoresystem.stock.StockRules
@@ -183,22 +183,16 @@ private fun ProductFormDialog(
     var unitValue by remember { mutableStateOf(unit) }
     var priceValue by remember { mutableStateOf(price) }
     var initial by remember { mutableStateOf("") }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                LabeledField("Nom", nameValue, { nameValue = it }, "Ex. Pain, Eau")
-                LabeledField("Unité", unitValue, { unitValue = it }, "pièce, carton, kg")
-                LabeledField("Prix unitaire", priceValue, { priceValue = it }, "0")
-                if (showInitial) {
-                    LabeledField("Quantité initiale au dépôt", initial, { initial = it }, "0")
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = { onSave(nameValue, unitValue, initial, priceValue) }) { Text("Enregistrer") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Annuler") } }
-    )
+    FormDialog(
+        title = title,
+        onDismiss = onDismiss,
+        onConfirm = { onSave(nameValue, unitValue, initial, priceValue) }
+    ) {
+        LabeledField("Nom", nameValue, { nameValue = it }, "Ex. Pain, Eau")
+        LabeledField("Unité", unitValue, { unitValue = it }, "pièce, carton, kg")
+        LabeledField("Prix unitaire", priceValue, { priceValue = it }, "0", KeyboardType.Decimal)
+        if (showInitial) {
+            LabeledField("Quantité initiale au dépôt", initial, { initial = it }, "0", KeyboardType.Decimal)
+        }
+    }
 }

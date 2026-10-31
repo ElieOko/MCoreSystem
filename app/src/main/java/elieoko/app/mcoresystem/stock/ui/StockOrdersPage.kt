@@ -121,51 +121,50 @@ private fun OrderEditor(viewModel: StockViewModel, onDismiss: () -> Unit) {
     var pickingProduct by remember { mutableStateOf(false) }
     val draft = remember { androidx.compose.runtime.mutableStateListOf<DeliveryLine>() }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Nouvelle commande") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                LabeledField("Client", customer, { customer = it })
-                TextButton(onClick = { pickingLivreur = true }) {
-                    val name = livreurs.firstOrNull { it.id == livreurId }?.name
-                    Text(name?.let { "Livreur : $it" } ?: "Assigner un livreur (facultatif)")
-                }
-                TextButton(onClick = { pickingProduct = true }) {
-                    val name = products.firstOrNull { it.id == productId }?.name
-                    Text(name ?: "Choisir un article")
-                }
-                LabeledField("Quantité commandée", quantity, { quantity = it })
-                TextButton(onClick = {
-                    val parsed = StockRules.parseQuantity(quantity) ?: return@TextButton
-                    if (productId <= 0) return@TextButton
-                    val index = draft.indexOfFirst { it.productId == productId }
-                    if (index >= 0) {
-                        draft[index] = DeliveryLine(productId, draft[index].quantity + parsed)
-                    } else {
-                        draft.add(DeliveryLine(productId, parsed))
-                    }
-                    quantity = ""
-                }) { Text("Ajouter la ligne") }
-                draft.forEach { line ->
-                    val name = products.firstOrNull { it.id == line.productId }?.name ?: "Article"
-                    Text("$name • ${StockRules.formatQty(line.quantity)}")
-                }
-                LabeledField("Note", note, { note = it }, "Facultatif")
+    FormDialog(
+        title = "Nouvelle commande",
+        onDismiss = onDismiss,
+        onConfirm = {
+            viewModel.createOrder(
+                customer = customer,
+                livreurId = livreurId.takeIf { it > 0 },
+                note = note,
+                lines = draft.toList()
+            ) { ok -> if (ok) onDismiss() }
+        }
+    ) {
+        LabeledField("Client", customer, { customer = it })
+        TextButton(onClick = { pickingLivreur = true }) {
+            val name = livreurs.firstOrNull { it.id == livreurId }?.name
+            Text(name?.let { "Livreur : $it" } ?: "Assigner un livreur (facultatif)")
+        }
+        TextButton(onClick = { pickingProduct = true }) {
+            val name = products.firstOrNull { it.id == productId }?.name
+            Text(name ?: "Choisir un article")
+        }
+        LabeledField(
+            "Quantité commandée",
+            quantity,
+            { quantity = it },
+            keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal
+        )
+        TextButton(onClick = {
+            val parsed = StockRules.parseQuantity(quantity) ?: return@TextButton
+            if (productId <= 0) return@TextButton
+            val index = draft.indexOfFirst { it.productId == productId }
+            if (index >= 0) {
+                draft[index] = DeliveryLine(productId, draft[index].quantity + parsed)
+            } else {
+                draft.add(DeliveryLine(productId, parsed))
             }
-        },
-        confirmButton = {
-            TextButton(onClick = {
-                viewModel.createOrder(
-                    customer = customer,
-                    livreurId = livreurId.takeIf { it > 0 },
-                    note = note,
-                    lines = draft.toList()
-                ) { ok -> if (ok) onDismiss() }
-            }) { Text("Enregistrer") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Fermer") } }
-    )
+            quantity = ""
+        }) { Text("Ajouter la ligne") }
+        draft.forEach { line ->
+            val name = products.firstOrNull { it.id == line.productId }?.name ?: "Article"
+            Text("$name • ${StockRules.formatQty(line.quantity)}")
+        }
+        LabeledField("Note", note, { note = it }, "Facultatif")
+    }
 
     if (pickingLivreur) {
         ChoiceList(
