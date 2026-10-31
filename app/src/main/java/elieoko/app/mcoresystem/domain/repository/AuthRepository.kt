@@ -218,5 +218,6 @@ class AuthRepository(
     companion object {
         private const val TAG = "AuthRepository"
         const val ROLE_ADMIN = "ADMIN"
+        const val ROLE_LIVREUR = "LIVREUR"
     }
 }
