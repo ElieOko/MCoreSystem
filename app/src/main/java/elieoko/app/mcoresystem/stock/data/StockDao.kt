@@ -67,4 +67,76 @@ interface StockDao {
 
     @Insert
     suspend fun insertMovement(movement: StockMovement)
+
+    @Query("SELECT COUNT(*) FROM stock_account")
+    fun observeAccountCount(): Flow<Int>
+
+    @Query("SELECT * FROM stock_account")
+    suspend fun allAccounts(): List<StockAccount>
+
+    @Query("SELECT * FROM stock_account WHERE livreur_id = :livreurId LIMIT 1")
+    suspend fun accountForLivreur(livreurId: Long): StockAccount?
+
+    @Query("SELECT COUNT(*) FROM stock_organism")
+    suspend fun countOrganisms(): Int
+
+    @Query("SELECT * FROM stock_organism WHERE organism_id = :id")
+    suspend fun getOrganism(id: Long): StockOrganism?
+
+    @Insert
+    suspend fun insertOrganism(organism: StockOrganism): Long
+
+    @Insert
+    suspend fun insertAccount(account: StockAccount): Long
+
+    @Update
+    suspend fun updateAccount(account: StockAccount)
+
+    @Query("DELETE FROM stock_account WHERE livreur_id = :livreurId")
+    suspend fun deleteAccountForLivreur(livreurId: Long)
+
+    @Query("SELECT * FROM stock_account WHERE organism_id = :organismId")
+    fun observeAccounts(organismId: Long): Flow<List<StockAccount>>
+
+    @Query("UPDATE stock_product SET organism_id = :organismId WHERE organism_id = 0")
+    suspend fun claimProducts(organismId: Long)
+
+    @Query("UPDATE stock_livreur SET organism_id = :organismId WHERE organism_id = 0")
+    suspend fun claimLivreurs(organismId: Long)
+
+    @Query("UPDATE mini_stock SET organism_id = :organismId WHERE organism_id = 0")
+    suspend fun claimMiniStocks(organismId: Long)
+
+    @Query("UPDATE stock_movement SET organism_id = :organismId WHERE organism_id = 0")
+    suspend fun claimMovements(organismId: Long)
+
+    @Query("SELECT COUNT(*) FROM stock_account WHERE organism_id = :organismId AND lower(username) = lower(:username)")
+    suspend fun usernameTaken(organismId: Long, username: String): Int
+
+    @Query("SELECT * FROM stock_order ORDER BY order_id DESC")
+    fun observeOrders(): Flow<List<StockOrder>>
+
+    @Query("SELECT * FROM stock_order_line")
+    fun observeOrderLines(): Flow<List<StockOrderLine>>
+
+    @Query("SELECT * FROM stock_order WHERE order_id = :id")
+    suspend fun getOrder(id: Long): StockOrder?
+
+    @Query("SELECT * FROM stock_order_line WHERE order_id = :orderId")
+    suspend fun linesForOrder(orderId: Long): List<StockOrderLine>
+
+    @Query("SELECT * FROM stock_order_line WHERE order_id = :orderId AND product_id = :productId LIMIT 1")
+    suspend fun getOrderLine(orderId: Long, productId: Long): StockOrderLine?
+
+    @Insert
+    suspend fun insertOrder(order: StockOrder): Long
+
+    @Update
+    suspend fun updateOrder(order: StockOrder)
+
+    @Insert
+    suspend fun insertOrderLine(line: StockOrderLine): Long
+
+    @Update
+    suspend fun updateOrderLine(line: StockOrderLine)
 }

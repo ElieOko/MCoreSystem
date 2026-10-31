@@ -43,4 +43,23 @@ class StockRulesTest {
         assertEquals("12", StockRules.formatQty(12.0))
         assertEquals("1,50", StockRules.formatQty(1.5))
     }
+
+    @Test
+    fun usernameRejectsShortOrSpacedValues() {
+        assertNull(StockRules.normalizeUsername("ab"))
+        assertNull(StockRules.normalizeUsername("jean paul"))
+        assertEquals("jean", StockRules.normalizeUsername(" jean "))
+    }
+
+    @Test
+    fun orderBecomesDeliveredOnlyWhenEveryLineIsCovered() {
+        assertEquals(
+            "EN_LIVRAISON",
+            StockRules.nextOrderStatus(listOf(5.0 to 2.0, 1.0 to 1.0))
+        )
+        assertEquals(
+            "LIVREE",
+            StockRules.nextOrderStatus(listOf(5.0 to 5.0, 1.0 to 2.0))
+        )
+    }
 }

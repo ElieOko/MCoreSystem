@@ -17,7 +17,11 @@ data class StockProduct(
     @ColumnInfo(name = "central_quantity")
     val centralQuantity: Double = 0.0,
     @ColumnInfo(name = "created_on")
-    val createdOn: String
+    val createdOn: String,
+    @ColumnInfo(name = "organism_id", defaultValue = "0")
+    val organismId: Long = 0,
+    @ColumnInfo(name = "uuid", defaultValue = "")
+    val uuid: String = ""
 )
 
 @Entity(tableName = "stock_livreur")
@@ -30,7 +34,11 @@ data class StockLivreur(
     @ColumnInfo(name = "phone")
     val phone: String = "",
     @ColumnInfo(name = "created_on")
-    val createdOn: String
+    val createdOn: String,
+    @ColumnInfo(name = "organism_id", defaultValue = "0")
+    val organismId: Long = 0,
+    @ColumnInfo(name = "uuid", defaultValue = "")
+    val uuid: String = ""
 )
 
 @Entity(
@@ -46,7 +54,9 @@ data class MiniStockLine(
     @ColumnInfo(name = "product_id")
     val productId: Long,
     @ColumnInfo(name = "quantity")
-    val quantity: Double
+    val quantity: Double,
+    @ColumnInfo(name = "organism_id", defaultValue = "0")
+    val organismId: Long = 0
 )
 
 enum class MovementType(val label: String) {
@@ -81,5 +91,94 @@ data class StockMovement(
     @ColumnInfo(name = "note")
     val note: String = "",
     @ColumnInfo(name = "created_on")
+    val createdOn: String,
+    @ColumnInfo(name = "organism_id", defaultValue = "0")
+    val organismId: Long = 0,
+    @ColumnInfo(name = "order_id")
+    val orderId: Long? = null
+)
+
+enum class StockRole { OWNER, LIVREUR }
+
+enum class OrderStatus(val label: String) {
+    BROUILLON("Brouillon"),
+    ASSIGNEE("Assignée"),
+    EN_LIVRAISON("En livraison"),
+    LIVREE("Livrée"),
+    ANNULEE("Annulée");
+
+    companion object {
+        fun from(raw: String): OrderStatus = entries.firstOrNull { it.name == raw } ?: BROUILLON
+    }
+}
+
+@Entity(tableName = "stock_organism")
+data class StockOrganism(
+    @PrimaryKey(autoGenerate = true)
+    @ColumnInfo(name = "organism_id")
+    val id: Long = 0,
+    @ColumnInfo(name = "uuid")
+    val uuid: String,
+    @ColumnInfo(name = "name")
+    val name: String,
+    @ColumnInfo(name = "created_on")
     val createdOn: String
+)
+
+@Entity(tableName = "stock_account")
+data class StockAccount(
+    @PrimaryKey(autoGenerate = true)
+    @ColumnInfo(name = "account_id")
+    val id: Long = 0,
+    @ColumnInfo(name = "organism_id")
+    val organismId: Long,
+    @ColumnInfo(name = "livreur_id")
+    val livreurId: Long? = null,
+    @ColumnInfo(name = "username")
+    val username: String,
+    @ColumnInfo(name = "password_hash")
+    val passwordHash: String,
+    @ColumnInfo(name = "role")
+    val role: String,
+    @ColumnInfo(name = "created_on")
+    val createdOn: String
+)
+
+@Entity(tableName = "stock_order")
+data class StockOrder(
+    @PrimaryKey(autoGenerate = true)
+    @ColumnInfo(name = "order_id")
+    val id: Long = 0,
+    @ColumnInfo(name = "organism_id")
+    val organismId: Long,
+    @ColumnInfo(name = "livreur_id")
+    val livreurId: Long? = null,
+    @ColumnInfo(name = "customer_name")
+    val customerName: String,
+    @ColumnInfo(name = "status")
+    val status: String,
+    @ColumnInfo(name = "note")
+    val note: String = "",
+    @ColumnInfo(name = "created_on")
+    val createdOn: String
+)
+
+@Entity(tableName = "stock_order_line")
+data class StockOrderLine(
+    @PrimaryKey(autoGenerate = true)
+    @ColumnInfo(name = "line_id")
+    val id: Long = 0,
+    @ColumnInfo(name = "order_id")
+    val orderId: Long,
+    @ColumnInfo(name = "product_id")
+    val productId: Long,
+    @ColumnInfo(name = "quantity_ordered")
+    val quantityOrdered: Double,
+    @ColumnInfo(name = "quantity_delivered")
+    val quantityDelivered: Double = 0.0
+)
+
+data class DeliveryLine(
+    val productId: Long,
+    val quantity: Double
 )

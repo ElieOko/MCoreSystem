@@ -13,12 +13,17 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.People
+import androidx.compose.material.icons.automirrored.filled.ReceiptLong
+import androidx.compose.material.icons.filled.Timeline
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -46,21 +51,30 @@ fun StockHomePage(
     onOpenLivreurs: () -> Unit,
     onGive: () -> Unit,
     onOpenLivreur: (Long) -> Unit,
-    onOpenMovements: () -> Unit
+    onOpenMovements: () -> Unit,
+    onOpenOrders: () -> Unit,
+    onOpenEvolution: () -> Unit,
+    onLogout: () -> Unit
 ) {
     val products by viewModel.products.collectAsState()
     val livreurs by viewModel.livreurs.collectAsState()
     val lines by viewModel.miniStocks.collectAsState()
     val movements by viewModel.movements.collectAsState()
+    val session by viewModel.session.collectAsState()
     val today = SimpleDateFormat("yyyy-MM-dd", Locale.FRANCE).format(Date())
     val centralUnits = products.sumOf { it.centralQuantity }
     val miniUnits = lines.sumOf { it.quantity }
     val todayCount = movements.count { it.createdOn.startsWith(today) }
 
     StockScaffold(
-        title = "Stock livreurs",
+        title = session?.organismName?.ifBlank { null } ?: "Stock livreurs",
         onBack = onLeave,
-        floatingAction = { StockFab(Icons.Default.Add, "Donner un mini-stock", onGive) }
+        floatingAction = { StockFab(Icons.Default.Add, "Donner un mini-stock", onGive) },
+        actions = {
+            IconButton(onClick = onLogout) {
+                Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = "Déconnexion")
+            }
+        }
     ) { padding ->
         LazyColumn(
             modifier = Modifier
@@ -71,7 +85,7 @@ fun StockHomePage(
         ) {
             item {
                 Text(
-                    "Dépôt et mini-stocks remis aux livreurs",
+                    "Propriétaire • dépôt, livreurs, commandes et historique",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -109,6 +123,12 @@ fun StockHomePage(
                     QuickTile("Articles", Icons.Default.Inventory2, Modifier.weight(1f), onOpenProducts)
                     QuickTile("Livreurs", Icons.Default.People, Modifier.weight(1f), onOpenLivreurs)
                     QuickTile("Historique", Icons.Default.History, Modifier.weight(1f), onOpenMovements)
+                }
+            }
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    QuickTile("Commandes", Icons.AutoMirrored.Filled.ReceiptLong, Modifier.weight(1f), onOpenOrders)
+                    QuickTile("Évolution", Icons.Default.Timeline, Modifier.weight(1f), onOpenEvolution)
                 }
             }
             item {

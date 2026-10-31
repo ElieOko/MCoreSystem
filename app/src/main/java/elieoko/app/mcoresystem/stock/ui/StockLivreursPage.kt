@@ -44,6 +44,7 @@ fun StockLivreursPage(
 ) {
     val livreurs by viewModel.livreurs.collectAsState()
     val lines by viewModel.miniStocks.collectAsState()
+    val accounts by viewModel.accounts.collectAsState()
     var creating by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<StockLivreur?>(null) }
     var deleting by remember { mutableStateOf<StockLivreur?>(null) }
@@ -63,6 +64,7 @@ fun StockLivreursPage(
             }
             items(livreurs, key = { it.id }) { livreur ->
                 val total = viewModel.livreurTotal(livreur.id, lines)
+                val login = accounts.firstOrNull { it.livreurId == livreur.id }?.username
                 Card(
                     onClick = { onOpenLivreur(livreur.id) },
                     shape = RoundedCornerShape(18.dp),
@@ -73,6 +75,11 @@ fun StockLivreursPage(
                         Text(livreur.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                         Text(
                             if (livreur.phone.isBlank()) "Sans téléphone" else livreur.phone,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            if (login.isNullOrBlank()) "Sans identifiant" else "Connexion : $login",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -100,9 +107,11 @@ fun StockLivreursPage(
             title = "Nouveau livreur",
             name = "",
             phone = "",
+            username = "",
+            requirePassword = true,
             onDismiss = { creating = false },
-            onSave = { name, phone ->
-                viewModel.createLivreur(name, phone) { ok -> if (ok) creating = false }
+            onSave = { name, phone, username, password ->
+                viewModel.createLivreur(name, phone, username, password) { ok -> if (ok) creating = false }
             }
         )
     }
@@ -111,9 +120,11 @@ fun StockLivreursPage(
             title = "Modifier le livreur",
             name = livreur.name,
             phone = livreur.phone,
+            username = accounts.firstOrNull { it.livreurId == livreur.id }?.username ?: "",
+            requirePassword = false,
             onDismiss = { editing = null },
-            onSave = { name, phone ->
-                viewModel.renameLivreur(livreur, name, phone) { ok -> if (ok) editing = null }
+            onSave = { name, phone, username, password ->
+                viewModel.renameLivreur(livreur, name, phone, username, password) { ok -> if (ok) editing = null }
             }
         )
     }
@@ -134,11 +145,15 @@ private fun LivreurFormDialog(
     title: String,
     name: String,
     phone: String,
+    username: String,
+    requirePassword: Boolean,
     onDismiss: () -> Unit,
-    onSave: (String, String) -> Unit
+    onSave: (String, String, String, String) -> Unit
 ) {
     var nameValue by remember { mutableStateOf(name) }
     var phoneValue by remember { mutableStateOf(phone) }
+    var usernameValue by remember { mutableStateOf(username) }
+    var passwordValue by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
@@ -146,9 +161,20 @@ private fun LivreurFormDialog(
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 LabeledField("Nom", nameValue, { nameValue = it })
                 LabeledField("Téléphone", phoneValue, { phoneValue = it }, "Facultatif")
+                LabeledField("Identifiant de connexion", usernameValue, { usernameValue = it })
+                LabeledField(
+                    if (requirePassword) "Mot de passe" else "Nouveau mot de passe",
+                    passwordValue,
+                    { passwordValue = it },
+                    if (requirePassword) "4 caractères minimum" else "Laisser vide pour conserver"
+                )
             }
         },
-        confirmButton = { TextButton(onClick = { onSave(nameValue, phoneValue) }) { Text("Enregistrer") } },
+        confirmButton = {
+            TextButton(onClick = { onSave(nameValue, phoneValue, usernameValue, passwordValue) }) {
+                Text("Enregistrer")
+            }
+        },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Annuler") } }
     )
 }
