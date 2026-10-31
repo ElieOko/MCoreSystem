@@ -26,6 +26,9 @@ interface IUserDao {
     @Query("SELECT * FROM TUser WHERE username = :username LIMIT 1")
     fun findByUsername(username: String): UserModel?
 
+    @Query("SELECT * FROM TUser WHERE organism_id = :organismId AND upper(role) = 'LIVREUR'")
+    fun findLivreurs(organismId: Int): List<UserModel>
+
     @Query("SELECT * FROM TUser WHERE uuid = :uuid LIMIT 1")
     fun findByUuid(uuid: String): UserModel?
 

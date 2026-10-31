@@ -8,6 +8,8 @@ import elieoko.app.mcoresystem.MCoreApplication
 import elieoko.app.mcoresystem.data.remote.ChangeTracker
 import elieoko.app.mcoresystem.domain.model.room.SyncQueueModel
 import elieoko.app.mcoresystem.domain.model.room.UserModel
+import elieoko.app.mcoresystem.domain.repository.AuthRepository
+import elieoko.app.mcoresystem.stock.data.LivreurProfile
 import elieoko.app.mcoresystem.stock.data.DeliveryLine
 import elieoko.app.mcoresystem.stock.data.MiniStockLine
 import elieoko.app.mcoresystem.stock.data.StockAuth
@@ -26,7 +28,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
@@ -60,31 +61,28 @@ class StockViewModel(application: Application) : AndroidViewModel(application) {
     val accountCount = repository.observeAccountCount()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), -1)
 
-    private val organismId = sessionState
-
-    val products = combine(repository.observeProducts(), organismId) { items, current ->
-        items.filter { current != null && it.organismId == current.organismId }
+    val products = sessionState.flatMapLatest { current ->
+        if (current == null) flowOf(emptyList()) else repository.observeProducts(current.organismId)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    val livreurs = combine(repository.observeLivreurs(), organismId) { items, current ->
-        items.filter { current != null && it.organismId == current.organismId }
+    val livreurs = sessionState.flatMapLatest { current ->
+        if (current == null) flowOf(emptyList()) else repository.observeLivreurs(current.organismId)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    val miniStocks = combine(repository.observeMiniStocks(), organismId) { items, current ->
-        items.filter { current != null && it.organismId == current.organismId }
+    val miniStocks = sessionState.flatMapLatest { current ->
+        if (current == null) flowOf(emptyList()) else repository.observeMiniStocks(current.organismId)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    val movements = combine(repository.observeMovements(), organismId) { items, current ->
-        items.filter { current != null && it.organismId == current.organismId }
+    val movements = sessionState.flatMapLatest { current ->
+        if (current == null) flowOf(emptyList()) else repository.observeMovements(current.organismId)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    val orders = combine(repository.observeOrders(), organismId) { items, current ->
-        items.filter { current != null && it.organismId == current.organismId }
+    val orders = sessionState.flatMapLatest { current ->
+        if (current == null) flowOf(emptyList()) else repository.observeOrders(current.organismId)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    val orderLines = combine(repository.observeOrderLines(), orders) { lines, currentOrders ->
-        val ids = currentOrders.map { it.id }.toSet()
-        lines.filter { it.orderId in ids }
+    val orderLines = sessionState.flatMapLatest { current ->
+        if (current == null) flowOf(emptyList()) else repository.observeOrderLines(current.organismId)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val accounts = sessionState.flatMapLatest { current ->
@@ -102,11 +100,15 @@ class StockViewModel(application: Application) : AndroidViewModel(application) {
         ) {
             return
         }
+        if (current != null && current.organismUuid != access.organismUuid) {
+            sessionState.value = null
+            readyState.value = false
+        }
         viewModelScope.launch {
             financeOrganismId = access.financeOrganismId
             val organism = repository.ensureOrganism(access.organismUuid, access.organismName)
-            val livreur = if (access.role.equals("LIVREUR", ignoreCase = true)) {
-                repository.livreurByUserUuid(access.userUuid)
+            val livreur = if (access.role.equals(AuthRepository.ROLE_LIVREUR, ignoreCase = true)) {
+                repository.livreurByUserUuid(access.userUuid, organism.id)
             } else {
                 null
             }
@@ -273,8 +275,12 @@ class StockViewModel(application: Application) : AndroidViewModel(application) {
             onDone(false)
             return
         }
-        launch("Livreur enregistré. Il se connecte avec la même page que l'organisation.", onDone) {
+        launch("Livreur enregistré dans les utilisateurs de l'organisation.", onDone) {
+            val current = sessionState.value
+                ?: return@launch StockResult.Error("Organisation introuvable")
             val app = getApplication<MCoreApplication>()
+            val finance = app.database.organismDao().findByUuid(current.organismUuid)
+                ?: return@launch StockResult.Error("Organisation introuvable. Reconnectez-vous.")
             val users = app.database.userDao()
             if (users.findByUsername(login) != null) {
                 return@launch StockResult.Error("Cet identifiant est déjà utilisé")
@@ -289,11 +295,12 @@ class StockViewModel(application: Application) : AndroidViewModel(application) {
                     phone = phone.trim().ifBlank { null },
                     email = null,
                     password = password,
-                    organismId = financeOrganismId.takeIf { it > 0 } ?: 1,
-                    role = "LIVREUR",
+                    organismId = finance.id,
+                    role = AuthRepository.ROLE_LIVREUR,
                     uuid = userUuid
                 )
             )
+            financeOrganismId = finance.id
             val result = repository.createLivreur(organism, name, phone, username, password, userUuid)
             if (result is StockResult.Error) {
                 users.findByUuid(userUuid)?.let { created ->
@@ -509,8 +516,24 @@ class StockViewModel(application: Application) : AndroidViewModel(application) {
         } catch (error: Exception) {
             Log.e(TAG, "Sync comptable impossible", error)
         }
+        cacheLivreursFromUsers()
         val uuid = sessionState.value?.organismUuid.orEmpty()
         return if (uuid.isBlank()) null else sync.sync(uuid)
+    }
+
+    private suspend fun cacheLivreursFromUsers() {
+        val current = sessionState.value ?: return
+        val app = getApplication<MCoreApplication>()
+        val finance = app.database.organismDao().findByUuid(current.organismUuid) ?: return
+        financeOrganismId = finance.id
+        val profiles = app.database.userDao().findLivreurs(finance.id).map { user ->
+            LivreurProfile(
+                userUuid = user.uuid,
+                name = user.username,
+                phone = user.phone.orEmpty()
+            )
+        }
+        repository.ensureLivreurProfiles(current.organismId, profiles)
     }
 
     private fun launch(success: String, onDone: (Boolean) -> Unit = {}, block: suspend () -> StockResult) {

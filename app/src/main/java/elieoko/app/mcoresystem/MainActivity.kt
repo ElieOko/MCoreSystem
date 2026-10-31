@@ -10,7 +10,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.*
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -102,7 +103,10 @@ class MainActivity : ComponentActivity() {
                 applicationViewModel.room.category = categoryViewModel
                 applicationViewModel.room.typeCategory = typeCategoryViewModel
                 applicationViewModel.room.organism = organismViewModel
-                Scaffold(modifier = Modifier.fillMaxSize()) {
+                Scaffold(
+                    modifier = Modifier.fillMaxSize(),
+                    contentWindowInsets = WindowInsets(0, 0, 0, 0)
+                ) {
                     Navigation(navHostController, applicationViewModel, startDestination)
                 }
             }

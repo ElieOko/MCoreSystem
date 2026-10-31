@@ -15,6 +15,12 @@ sealed class StockResult {
     data class Error(val message: String) : StockResult()
 }
 
+data class LivreurProfile(
+    val userUuid: String,
+    val name: String,
+    val phone: String
+)
+
 sealed class StockAuth {
     data class Success(val session: StockSession) : StockAuth()
     data class Error(val message: String) : StockAuth()
@@ -25,14 +31,14 @@ private class StockFailure(message: String) : Exception(message)
 class StockRepository(private val database: StockDatabase) {
     private val dao = database.stockDao()
 
-    fun observeProducts(): Flow<List<StockProduct>> = dao.observeProducts()
-    fun observeLivreurs(): Flow<List<StockLivreur>> = dao.observeLivreurs()
-    fun observeMiniStocks(): Flow<List<MiniStockLine>> = dao.observeMiniStocks()
-    fun observeMovements(): Flow<List<StockMovement>> = dao.observeMovements()
+    fun observeProducts(organismId: Long): Flow<List<StockProduct>> = dao.observeProducts(organismId)
+    fun observeLivreurs(organismId: Long): Flow<List<StockLivreur>> = dao.observeLivreurs(organismId)
+    fun observeMiniStocks(organismId: Long): Flow<List<MiniStockLine>> = dao.observeMiniStocks(organismId)
+    fun observeMovements(organismId: Long): Flow<List<StockMovement>> = dao.observeMovements(organismId)
     fun observeAccountCount(): Flow<Int> = dao.observeAccountCount()
     fun observeAccounts(organismId: Long): Flow<List<StockAccount>> = dao.observeAccounts(organismId)
-    fun observeOrders(): Flow<List<StockOrder>> = dao.observeOrders()
-    fun observeOrderLines(): Flow<List<StockOrderLine>> = dao.observeOrderLines()
+    fun observeOrders(organismId: Long): Flow<List<StockOrder>> = dao.observeOrders(organismId)
+    fun observeOrderLines(organismId: Long): Flow<List<StockOrderLine>> = dao.observeOrderLines(organismId)
 
     suspend fun registerOrganization(name: String, username: String, password: String): StockAuth {
         val orgName = StockRules.cleanName(name) ?: return StockAuth.Error("Le nom de l'organisation est requis")
@@ -558,14 +564,37 @@ class StockRepository(private val database: StockDatabase) {
         return listOf(prefix, extra).filter { it.isNotBlank() }.joinToString(" — ")
     }
 
-    suspend fun livreurByUserUuid(userUuid: String): StockLivreur? {
+    suspend fun livreurByUserUuid(userUuid: String, organismId: Long): StockLivreur? {
         if (userUuid.isBlank()) return null
-        return dao.livreurByUserUuid(userUuid)
+        return dao.livreurByUserUuid(userUuid, organismId)
     }
 
     /**
-     * L'organisation du stock porte le même uuid que l'organisme comptable,
-     * pour que les lignes poussées appartiennent à public.organisms.
+     * Crée le profil stock des comptes déjà présents dans la table utilisateurs
+     * de cette organisation. Ne touche pas aux lignes d'une autre organisation.
+     */
+    suspend fun ensureLivreurProfiles(organismId: Long, profiles: List<LivreurProfile>) {
+        val stamp = iso()
+        for (profile in profiles) {
+            if (profile.userUuid.isBlank()) continue
+            if (dao.livreurByUserUuid(profile.userUuid, organismId) != null) continue
+            dao.insertLivreur(
+                StockLivreur(
+                    name = profile.name.ifBlank { profile.userUuid },
+                    phone = profile.phone,
+                    createdOn = now(),
+                    organismId = organismId,
+                    uuid = UUID.randomUUID().toString(),
+                    userUuid = profile.userUuid,
+                    updatedAt = stamp
+                )
+            )
+        }
+    }
+
+    /**
+     * Une ligne locale par uuid d'organisation. Le cache d'une organisation
+     * n'est jamais réécrit avec l'uuid d'une autre.
      */
     suspend fun ensureOrganism(uuid: String, name: String): StockOrganism {
         val cleanName = name.trim().ifBlank { "Organisation" }
@@ -576,21 +605,18 @@ class StockRepository(private val database: StockDatabase) {
             dao.updateOrganism(updated)
             return updated
         }
-        val all = dao.allOrganisms()
-        if (all.size == 1) {
-            val retargeted = all.first().copy(uuid = uuid, name = cleanName, updatedAt = iso())
-            dao.updateOrganism(retargeted)
-            return retargeted
-        }
         val createdOn = now()
+        val adoptOrphans = dao.countOrganisms() == 0
         val id = dao.insertOrganism(
             StockOrganism(uuid = uuid, name = cleanName, createdOn = createdOn, updatedAt = iso())
         )
-        dao.claimProducts(id)
-        dao.claimLivreurs(id)
-        dao.claimMiniStocks(id)
-        dao.claimMovements(id)
-        dao.claimOrders(id)
+        if (adoptOrphans) {
+            dao.claimProducts(id)
+            dao.claimLivreurs(id)
+            dao.claimMiniStocks(id)
+            dao.claimMovements(id)
+            dao.claimOrders(id)
+        }
         return dao.getOrganism(id)
             ?: StockOrganism(id = id, uuid = uuid, name = cleanName, createdOn = createdOn, updatedAt = iso())
     }

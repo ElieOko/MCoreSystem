@@ -14,7 +14,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -64,6 +63,7 @@ fun StockLivreursPage(
             }
             items(livreurs, key = { it.id }) { livreur ->
                 val total = viewModel.livreurTotal(livreur.id, lines)
+                val kinds = lines.count { it.livreurId == livreur.id && it.quantity > 0.0 }
                 val login = accounts.firstOrNull { it.livreurId == livreur.id }?.username
                 Card(
                     onClick = { onOpenLivreur(livreur.id) },
@@ -84,7 +84,7 @@ fun StockLivreursPage(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
-                            "Mini-stock : ${StockRules.formatQty(total)} unités",
+                            "Mini-stock : ${StockRules.formatQty(total)} unités • $kinds article(s)",
                             style = MaterialTheme.typography.bodyMedium,
                             modifier = Modifier.padding(top = 6.dp)
                         )
@@ -154,27 +154,20 @@ private fun LivreurFormDialog(
     var phoneValue by remember { mutableStateOf(phone) }
     var usernameValue by remember { mutableStateOf(username) }
     var passwordValue by remember { mutableStateOf("") }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                LabeledField("Nom", nameValue, { nameValue = it })
-                LabeledField("Téléphone", phoneValue, { phoneValue = it }, "Facultatif")
-                LabeledField("Identifiant de connexion", usernameValue, { usernameValue = it })
-                LabeledField(
-                    if (requirePassword) "Mot de passe" else "Nouveau mot de passe",
-                    passwordValue,
-                    { passwordValue = it },
-                    if (requirePassword) "4 caractères minimum" else "Laisser vide pour conserver"
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = { onSave(nameValue, phoneValue, usernameValue, passwordValue) }) {
-                Text("Enregistrer")
-            }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Annuler") } }
-    )
+    FormDialog(
+        title = title,
+        onDismiss = onDismiss,
+        onConfirm = { onSave(nameValue, phoneValue, usernameValue, passwordValue) }
+    ) {
+        LabeledField("Nom", nameValue, { nameValue = it })
+        LabeledField("Téléphone", phoneValue, { phoneValue = it }, "Facultatif", androidx.compose.ui.text.input.KeyboardType.Phone)
+        LabeledField("Identifiant de connexion", usernameValue, { usernameValue = it })
+        LabeledField(
+            if (requirePassword) "Mot de passe" else "Nouveau mot de passe",
+            passwordValue,
+            { passwordValue = it },
+            if (requirePassword) "4 caractères minimum" else "Laisser vide pour conserver",
+            password = true
+        )
+    }
 }

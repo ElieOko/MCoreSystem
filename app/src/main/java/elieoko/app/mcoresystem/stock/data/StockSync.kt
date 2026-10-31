@@ -153,6 +153,7 @@ class StockSync(private val database: StockDatabase) {
                         unit = remote.unit,
                         centralQuantity = remote.centralQuantity,
                         unitPrice = remote.unitPrice,
+                        organismId = organism.id,
                         updatedAt = remote.updatedAt
                     )
                 )
@@ -171,6 +172,7 @@ class StockSync(private val database: StockDatabase) {
                         name = remote.name,
                         phone = remote.phone,
                         userUuid = remote.userUuid.orEmpty(),
+                        organismId = organism.id,
                         updatedAt = remote.updatedAt
                     )
                 )
@@ -188,7 +190,14 @@ class StockSync(private val database: StockDatabase) {
             if (local == null) {
                 dao.insertMini(remote.toLocal(organism.id, livreur.id, product.id))
             } else if (TimeUtil.isNewer(remote.updatedAt, local.updatedAt)) {
-                dao.updateMini(local.copy(quantity = remote.quantity, uuid = remote.uuid, updatedAt = remote.updatedAt))
+                dao.updateMini(
+                    local.copy(
+                        quantity = remote.quantity,
+                        uuid = remote.uuid,
+                        organismId = organism.id,
+                        updatedAt = remote.updatedAt
+                    )
+                )
             }
         }
         val remoteOrders = client.from(ORDERS).select(Columns.ALL) {
@@ -206,6 +215,7 @@ class StockSync(private val database: StockDatabase) {
                         status = remote.status,
                         note = remote.note,
                         livreurId = livreurId,
+                        organismId = organism.id,
                         updatedAt = remote.updatedAt
                     )
                 )

@@ -8,17 +8,17 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface StockDao {
-    @Query("SELECT * FROM stock_product ORDER BY name COLLATE NOCASE")
-    fun observeProducts(): Flow<List<StockProduct>>
+    @Query("SELECT * FROM stock_product WHERE organism_id = :organismId ORDER BY name COLLATE NOCASE")
+    fun observeProducts(organismId: Long): Flow<List<StockProduct>>
 
-    @Query("SELECT * FROM stock_livreur ORDER BY name COLLATE NOCASE")
-    fun observeLivreurs(): Flow<List<StockLivreur>>
+    @Query("SELECT * FROM stock_livreur WHERE organism_id = :organismId ORDER BY name COLLATE NOCASE")
+    fun observeLivreurs(organismId: Long): Flow<List<StockLivreur>>
 
-    @Query("SELECT * FROM mini_stock")
-    fun observeMiniStocks(): Flow<List<MiniStockLine>>
+    @Query("SELECT * FROM mini_stock WHERE organism_id = :organismId")
+    fun observeMiniStocks(organismId: Long): Flow<List<MiniStockLine>>
 
-    @Query("SELECT * FROM stock_movement ORDER BY movement_id DESC")
-    fun observeMovements(): Flow<List<StockMovement>>
+    @Query("SELECT * FROM stock_movement WHERE organism_id = :organismId ORDER BY movement_id DESC")
+    fun observeMovements(organismId: Long): Flow<List<StockMovement>>
 
     @Query("SELECT * FROM stock_product WHERE product_id = :id")
     suspend fun getProduct(id: Long): StockProduct?
@@ -101,8 +101,8 @@ interface StockDao {
     @Query("SELECT * FROM stock_livreur WHERE organism_id = :organismId")
     suspend fun livreursOf(organismId: Long): List<StockLivreur>
 
-    @Query("SELECT * FROM stock_livreur WHERE user_uuid = :userUuid LIMIT 1")
-    suspend fun livreurByUserUuid(userUuid: String): StockLivreur?
+    @Query("SELECT * FROM stock_livreur WHERE user_uuid = :userUuid AND organism_id = :organismId LIMIT 1")
+    suspend fun livreurByUserUuid(userUuid: String, organismId: Long): StockLivreur?
 
     @Query("SELECT * FROM mini_stock WHERE organism_id = :organismId")
     suspend fun minisOf(organismId: Long): List<MiniStockLine>
@@ -167,11 +167,11 @@ interface StockDao {
     @Query("SELECT COUNT(*) FROM stock_account WHERE organism_id = :organismId AND lower(username) = lower(:username)")
     suspend fun usernameTaken(organismId: Long, username: String): Int
 
-    @Query("SELECT * FROM stock_order ORDER BY order_id DESC")
-    fun observeOrders(): Flow<List<StockOrder>>
+    @Query("SELECT * FROM stock_order WHERE organism_id = :organismId ORDER BY order_id DESC")
+    fun observeOrders(organismId: Long): Flow<List<StockOrder>>
 
-    @Query("SELECT * FROM stock_order_line")
-    fun observeOrderLines(): Flow<List<StockOrderLine>>
+    @Query("SELECT * FROM stock_order_line WHERE order_id IN (SELECT order_id FROM stock_order WHERE organism_id = :organismId)")
+    fun observeOrderLines(organismId: Long): Flow<List<StockOrderLine>>
 
     @Query("SELECT * FROM stock_order WHERE order_id = :id")
     suspend fun getOrder(id: Long): StockOrder?

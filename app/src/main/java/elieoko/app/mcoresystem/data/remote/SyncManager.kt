@@ -158,10 +158,14 @@ class SyncManager(private val database: MCoreRoomDatabase) {
             }
             SyncQueueModel.TYPE_USER -> {
                 val local = database.userDao().findByUuid(entry.entityUuid) ?: return
+                val organismUuid = database.organismDao().findById(local.organismId)?.uuid
+                if (organismUuid.isNullOrBlank()) {
+                    throw IllegalStateException("Compte sans organisation : ${local.username}")
+                }
                 client.from(TABLE_USERS).upsert(
                     RemoteUser(
                         uuid = local.uuid,
-                        organismUuid = organismUuidFor(local.organismId),
+                        organismUuid = organismUuid,
                         username = local.username,
                         email = local.email,
                         phone = local.phone,

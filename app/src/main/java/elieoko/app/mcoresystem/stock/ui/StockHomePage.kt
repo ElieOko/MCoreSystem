@@ -142,10 +142,17 @@ fun StockHomePage(
                 items(livreurs, key = { it.id }) { livreur ->
                     val total = viewModel.livreurTotal(livreur.id, lines)
                     val kinds = lines.count { it.livreurId == livreur.id && it.quantity > 0.0 }
+                    val value = lines.filter { it.livreurId == livreur.id }.sumOf { line ->
+                        val price = products.firstOrNull { it.id == line.productId }?.unitPrice ?: 0.0
+                        line.quantity * price
+                    }
                     InfoCard(
                         title = livreur.name,
                         value = "${StockRules.formatQty(total)} unités",
-                        subtitle = if (livreur.phone.isBlank()) "$kinds article(s)" else "${livreur.phone} • $kinds article(s)",
+                        subtitle = buildString {
+                            append("$kinds article(s) • ${StockRules.formatAmount(value)}")
+                            if (livreur.phone.isNotBlank()) append(" • ${livreur.phone}")
+                        },
                         onClick = { onOpenLivreur(livreur.id) }
                     )
                 }
