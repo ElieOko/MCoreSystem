@@ -5,6 +5,7 @@ import elieoko.app.mcoresystem.data.remote.SupabaseProvider
 import elieoko.app.mcoresystem.domain.util.TimeUtil
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.query.Columns
+import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import java.util.UUID
@@ -27,7 +28,7 @@ class StockSync(private val database: StockDatabase) {
             null
         } catch (error: Exception) {
             Log.e(TAG, "Sync stock impossible", error)
-            error.message ?: "Synchronisation du stock impossible"
+            readableSyncError(error)
         }
     }
 
@@ -258,6 +259,16 @@ class StockSync(private val database: StockDatabase) {
 
     companion object {
         private const val TAG = "StockSync"
+
+        private fun readableSyncError(error: Exception): String {
+            val raw = error.message.orEmpty()
+            val column = Regex("""null value in column "([^"]+)"""").find(raw)?.groupValues?.getOrNull(1)
+            if (column != null) {
+                return "Synchronisation refusée : le champ « $column » est vide."
+            }
+            return raw.lineSequence().firstOrNull { it.isNotBlank() }?.take(180)
+                ?: "Synchronisation du stock impossible"
+        }
         const val PRODUCTS = "stock_products"
         const val LIVREURS = "stock_livreurs"
         const val MINIS = "mini_stocks"
@@ -271,21 +282,21 @@ class StockSync(private val database: StockDatabase) {
 data class RemoteStockProduct(
     val uuid: String,
     @SerialName("organism_uuid") val organismUuid: String,
-    val name: String = "",
-    val unit: String = "pièce",
-    @SerialName("central_quantity") val centralQuantity: Double = 0.0,
-    @SerialName("unit_price") val unitPrice: Double = 0.0,
-    @SerialName("updated_at") val updatedAt: String = ""
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS) val name: String = "",
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS) val unit: String = "pièce",
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS) @SerialName("central_quantity") val centralQuantity: Double = 0.0,
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS) @SerialName("unit_price") val unitPrice: Double = 0.0,
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS) @SerialName("updated_at") val updatedAt: String = ""
 )
 
 @Serializable
 data class RemoteStockLivreur(
     val uuid: String,
     @SerialName("organism_uuid") val organismUuid: String,
-    val name: String = "",
-    val phone: String = "",
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS) val name: String = "",
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS) val phone: String = "",
     @SerialName("user_uuid") val userUuid: String? = null,
-    @SerialName("updated_at") val updatedAt: String = ""
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS) @SerialName("updated_at") val updatedAt: String = ""
 )
 
 @Serializable
@@ -294,8 +305,8 @@ data class RemoteMiniStock(
     @SerialName("organism_uuid") val organismUuid: String,
     @SerialName("livreur_uuid") val livreurUuid: String,
     @SerialName("product_uuid") val productUuid: String,
-    val quantity: Double = 0.0,
-    @SerialName("updated_at") val updatedAt: String = ""
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS) val quantity: Double = 0.0,
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS) @SerialName("updated_at") val updatedAt: String = ""
 )
 
 @Serializable
@@ -303,11 +314,11 @@ data class RemoteStockOrder(
     val uuid: String,
     @SerialName("organism_uuid") val organismUuid: String,
     @SerialName("livreur_uuid") val livreurUuid: String? = null,
-    @SerialName("customer_name") val customerName: String = "",
-    val status: String = "BROUILLON",
-    val note: String = "",
-    @SerialName("created_on") val createdOn: String = "",
-    @SerialName("updated_at") val updatedAt: String = ""
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS) @SerialName("customer_name") val customerName: String = "",
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS) val status: String = "BROUILLON",
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS) val note: String = "",
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS) @SerialName("created_on") val createdOn: String = "",
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS) @SerialName("updated_at") val updatedAt: String = ""
 )
 
 @Serializable
@@ -315,9 +326,9 @@ data class RemoteStockOrderLine(
     val uuid: String,
     @SerialName("order_uuid") val orderUuid: String,
     @SerialName("product_uuid") val productUuid: String,
-    @SerialName("quantity_ordered") val quantityOrdered: Double = 0.0,
-    @SerialName("quantity_delivered") val quantityDelivered: Double = 0.0,
-    @SerialName("updated_at") val updatedAt: String = ""
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS) @SerialName("quantity_ordered") val quantityOrdered: Double = 0.0,
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS) @SerialName("quantity_delivered") val quantityDelivered: Double = 0.0,
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS) @SerialName("updated_at") val updatedAt: String = ""
 )
 
 @Serializable
@@ -326,19 +337,24 @@ data class RemoteStockMovement(
     @SerialName("organism_uuid") val organismUuid: String,
     val type: String,
     @SerialName("product_uuid") val productUuid: String? = null,
-    @SerialName("product_name") val productName: String = "",
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS) @SerialName("product_name") val productName: String = "",
     @SerialName("livreur_uuid") val livreurUuid: String? = null,
     @SerialName("livreur_name") val livreurName: String? = null,
     @SerialName("order_uuid") val orderUuid: String? = null,
-    val quantity: Double = 0.0,
-    val note: String = "",
-    @SerialName("created_on") val createdOn: String = "",
-    @SerialName("updated_at") val updatedAt: String = ""
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS) val quantity: Double = 0.0,
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS) val note: String = "",
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS) @SerialName("created_on") val createdOn: String = "",
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS) @SerialName("updated_at") val updatedAt: String = ""
 )
 
 private fun StockProduct.toRemote(organismUuid: String) = RemoteStockProduct(
-    uuid = uuid, organismUuid = organismUuid, name = name, unit = unit,
-    centralQuantity = centralQuantity, unitPrice = unitPrice, updatedAt = updatedAt
+    uuid = uuid,
+    organismUuid = organismUuid,
+    name = name,
+    unit = unit.ifBlank { "pièce" },
+    centralQuantity = centralQuantity,
+    unitPrice = if (unitPrice.isNaN()) 0.0 else unitPrice,
+    updatedAt = updatedAt
 )
 
 private fun StockLivreur.toRemote(organismUuid: String) = RemoteStockLivreur(
